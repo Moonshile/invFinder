@@ -510,7 +510,10 @@ module Storage = struct
     in
     Out_channel.write_lines name strs
 
-  let replace filename key value convertor = replace_many filename key [value] convertor
+  let replace filename key value convertor =
+    let name = sprintf "%s.%s.cache" filename key in
+    let str = Sexp.to_string (convertor value) in
+    Out_channel.write_all name str
 
   let get_many filename key default convertor =
     let name = sprintf "%s.%s.cache" filename key in
