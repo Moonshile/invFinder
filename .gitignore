@@ -8,6 +8,16 @@
 *.cmxs
 *.cmxa
 
+*.out
+*.smt2
+checker
+*.pyc
+*.res
+*.err
+*.cache
+*.thy
+
+
 # ocamlbuild working directory
 _build/
 
