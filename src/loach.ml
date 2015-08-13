@@ -216,12 +216,12 @@ let analyze_if statement guard ~types =
 
 
 
-let get_var_of_balanced s =
+let rec get_var_of_balanced s =
   match s with
   | Assign(v, _)
-  | IfelseStatement(_, Assign(v, _), _)
-  | ForStatement(Assign(v, _), _)
-  | ForStatement(IfelseStatement(_, Assign(v, _), _), _) -> v
+  | ForStatement(Assign(v, _), _) -> v
+  | IfelseStatement(_, s, _)
+  | ForStatement(IfelseStatement(_, s, _), _) -> get_var_of_balanced s
   | _ -> raise Empty_exception
 
 let get_vname_map_of_balanced sl =

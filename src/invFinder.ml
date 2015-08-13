@@ -187,8 +187,20 @@ let rec exp_eval exp ~assigns =
         let rec analyze_exp e =
           match e with
           | Ite(f, e1, e2) ->
-            let res1 = List.map (analyze_exp e1) ~f:(fun (g, e) -> andList [g; f], e) in
-            let res2 = List.map (analyze_exp e2) ~f:(fun (g, e) -> andList [g; neg f], e) in
+            let f1 =
+              let ff = simplify f in
+              match ff with | OrList(fl) -> fl | _ -> [ff]
+            in
+            let f2 =
+              let ff = simplify (neg f) in
+              match ff with | OrList(fl) -> fl | _ -> [ff]
+            in
+            let res1 = List.concat (List.map (analyze_exp e1) ~f:(fun (g, e) ->
+              List.map f1 ~f:(fun f -> andList [g; f], e)
+            )) in
+            let res2 = List.concat (List.map (analyze_exp e2) ~f:(fun (g, e) ->
+              List.map f2 ~f:(fun f -> andList [g; f], e)
+            )) in
             res1@res2
           | _ -> [(chaos, e)]
         in
