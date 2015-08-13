@@ -718,7 +718,7 @@ let tabular_rules_cinvs rname_paraminfo_pairs cinvs =
     | cinv::cinvs' ->
       let (new_cinvs, new_relations) = get_res_of_cinv cinv rname_paraminfo_pairs in
       let cinvs'' = cinvs'@new_cinvs in
-      write_res_cache new_cinvs new_relations;
+      write_res_cache cinvs'' new_relations;
       wrapper cinvs'' (relations@new_relations)
   in
   let cinvs, relations = read_res_cache cinvs in
