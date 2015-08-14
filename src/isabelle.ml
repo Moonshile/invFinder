@@ -9,6 +9,7 @@ open Utils
 open Core.Std
 open Paramecium
 open Loach
+open InvFinder
 
 exception Unsupported of string
 
@@ -221,6 +222,14 @@ let invs_act cinvs =
   sprintf "%s\n\ndefinition invariants::\"nat \\<Rightarrow> formula set\" where [simp]:
 \"invariants N \\<equiv> {f.\n%s\n}\"" inv_strs inv_insts_str
 
+
+
+
+
+
+
+
+
 let init_act statement i =
   let quant, body =
     match statement with
@@ -273,6 +282,171 @@ let inits_act statements =
 
 
 
+module ToIsabelle = struct
+
+  let const_act c =
+    match c with
+    | Intc(i) -> sprintf "%d" i
+    | Strc(s) -> s
+    | Boolc(b) -> sprintf "%b" b
+
+  let paramref_act pr =
+    match pr with
+    | Paramref(name) -> name
+    | Paramfix(_, _, c) -> const_act c
+
+  let var_act (Arr(vs)) =
+    String.concat ~sep:"_" (List.map vs ~f:(fun (name, prs) ->
+      sprintf "%s%s" name (String.concat (List.map prs ~f:paramref_act))
+    ))
+  
+  let exp_act e =
+    match e with
+    | Paramecium.Const(c) -> const_act c
+    | Var(v) -> var_act v
+    | Param(pr) -> paramref_act pr
+    | Ite(_) -> raise Empty_exception
+
+  let rec form_act f =
+    match f with
+    | Paramecium.Chaos -> "true"
+    | Miracle -> "false"
+    | Eqn(e1, e2) -> sprintf "%s=%s" (exp_act e1) (exp_act e2)
+    | Neg(f) -> sprintf "\\<not>(%s)" (form_act f)
+    | AndList(fl) ->
+      String.concat ~sep:"\\<and>" (List.map fl ~f:(fun f -> sprintf "(%s)" (form_act f)))
+    | OrList(fl) -> 
+      String.concat ~sep:"\\<or>" (List.map fl ~f:(fun f -> sprintf "(%s)" (form_act f)))
+    | Imply(f1, f2) -> sprintf "(%s)\\<rightarrow>(%s)" (form_act f1) (form_act f2)
+
+end
+
+
+
+
+
+
+
+let gen_case_1 =
+"    have invHoldForRule1 f r (invariants N)
+    proof(cut_tac a1 a2 b1 c1, auto) qed
+    then have invHoldForRule f r (invariants N) by auto"
+
+let gen_case_2 =
+"    have invHoldForRule2 f r (invariants N)
+    proof(cut_tac a1 a2 b1 c1, auto) qed
+    then have invHoldForRule f r (invariants N) by auto"
+
+let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
+  let form_isabelle = ToIsabelle.form_act f in
+  sprintf
+"    have invHoldForRule3 f r (invariants N)
+    proof(cut_tac a1 a2 b1 c1, simp, rule_tac x=%s in exI, auto) qed
+    then have invHoldForRule f r (invariants N) by auto" form_isabelle
+
+let gen_branch branch case =
+  sprintf "  moreover { assume c1: %s\n  %s\n  }" branch case
+
+let gen_inst relations condition =
+  let analyze_branch {rule=_; inv; branch; relation} =
+    let ConcreteProp(Prop(_, _, g), _) = form_2_concreate_prop branch in
+    let branch_str = ToIsabelle.form_act g in
+    let case_str =
+      match relation with
+      | InvHoldForRule1 -> gen_case_1
+      | InvHoldForRule2 -> gen_case_2
+      | InvHoldForRule3(cp) -> gen_case_3 cp
+    in
+    branch_str, gen_branch branch_str case_str
+  in
+  let branches, moreovers = List.unzip (List.map relations ~f:analyze_branch) in
+  sprintf 
+"moreover { assume b1: %s
+have %s by auto
+%s
+}" condition (String.concat ~sep:"\\<and>" branches) (String.concat ~sep:"\n" moreovers)
+
+let analyze_rels_among_pfs pfs_lists =
+  let rec wrapper pfs_lists res =
+    match pfs_lists with
+    | [] -> raise Empty_exception (*TODO*)
+    | [_] -> res
+    | pfs_list::pfs_lists' ->
+      let r = String.concat ~sep:"\\<and>" (List.map pfs_list ~f:(fun (Paramfix(vn, tn, c)) ->
+        String.concat ~sep:"\\<and>" (List.map (List.concat pfs_lists') ~f:(fun pf' ->
+          let Paramfix(vn', tn', c') = pf' in
+          if tn = tn' then
+            match c = c' with
+            | true -> sprintf "%s=%s" vn vn'
+            | false -> sprintf "%s~=%s" vn vn'
+          else begin
+            ""
+          end
+        ))
+      )) in
+      wrapper pfs_lists' (res@[r])
+  in
+  String.concat ~sep:"\\<and>" (wrapper pfs_lists [])
+
+let get_param_name_list pfs =
+  String.concat ~sep:" " (List.map pfs ~f:(fun pf ->
+    let Paramfix(vn, _, _) = pf in vn
+  ))
+
+let analyze_rels_in_pfs t name pfs =
+  let part1 = String.concat ~sep:"\\<and>" (List.map pfs ~f:(fun pf ->
+    let Paramfix(vn, _, _) = pf in sprintf "%s\\<le>N" vn
+  )) in
+  let pairs = combination pfs 2 in
+  let part2 = String.concat ~sep:"\\<and>" (List.map pairs ~f:(fun [pf1; pf2] ->
+    let Paramfix(vn1, _, _), Paramfix(vn2, _, _) = pf1, pf2 in sprintf "%s~=%s" vn1 vn2
+  )) in
+  sprintf "%s\\<and>%s\\<and>%s=name %s" part1 part2 t (get_param_name_list pfs)
+
+let analyze_lemma rels pfs_prop =
+  let pfs =
+    match rels with
+    | [] -> raise Empty_exception
+    | {rule; inv=_; branch=_; relation=_}::_ ->
+      let ConcreteRule(_, pfs) = rule in
+      pfs
+  in
+  let condition = analyze_rels_among_pfs [pfs; pfs_prop] in
+  let moreovers = gen_inst rels condition in
+  condition, moreovers
+
+let gen_lemma relations =
+  let ConcreteRule(rn, pfs_r), ConcreteProp(Prop(pn, _, _), pfs_prop) =
+    match relations with
+    | ({rule; inv; branch=_; relation=_}::_)::_ -> rule, inv
+    | _ -> raise Empty_exception
+  in
+  let res = List.map relations ~f:(fun rels -> analyze_lemma rels pfs_prop) in
+  let conditions, moreovers = List.unzip res in
+  sprintf
+"lemma %sVs%s:
+assumes a1: \\<exists> %s. %s and
+a2: \\<exists> %s. %s
+shows invHoldForRule f r (invariants N)
+proof -
+from a1 obtain %s where
+  a1:\"%s\"
+by blast
+from a2 obtain %s where
+  a2:\"%s\"
+by blast
+have %s by auto
+%s
+"
+  rn pn
+  (get_param_name_list pfs_r) (analyze_rels_in_pfs "r" rn pfs_r)
+  (get_param_name_list pfs_prop) (analyze_rels_in_pfs "f" pn pfs_prop)
+  (get_param_name_list pfs_r)
+  (analyze_rels_in_pfs "r" rn pfs_r)
+  (get_param_name_list pfs_prop)
+  (analyze_rels_in_pfs "f" pn pfs_prop)
+  (String.concat ~sep:"\\<or>" conditions)
+  (String.concat ~sep:"\n" moreovers)
 
 
 
@@ -287,6 +461,7 @@ let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varn
   let (cinvs, _) = List.unzip cinvs_with_varnames in
   let invs_str = invs_act cinvs in
   let inits_str = inits_act init in
+  let lemmas_str = String.concat ~sep:"\n\n" (List.map relations ~f:gen_lemma) in
   sprintf "\
 theory %s imports localesDef
 begin
@@ -295,4 +470,5 @@ section{*Main definitions*}
 %s\n
 %s\n
 %s\n
-end\n" name types_str rules_str invs_str inits_str
+%s\n
+end\n" name types_str rules_str invs_str inits_str lemmas_str
