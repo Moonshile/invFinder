@@ -382,6 +382,27 @@ end
 
 
 
+
+module VarNamesOfAssigns = struct
+  
+  open String.Set
+  
+  include VarNames
+
+  let rec of_statement s =
+    match s with
+    | Assign(v, e) -> of_var v
+    | Parallel(slist) -> union_list (List.map slist ~f:of_statement)
+
+  let of_rule r =
+    match r with
+    | Rule(_, _, _, s) -> of_statement s
+
+end
+
+
+
+
 (*********************************** Module Variable Names, with Param values *****************)
 
 (** Get variable names in the components *)

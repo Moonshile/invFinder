@@ -18,12 +18,19 @@ exception Parameter_overflow
 (** Concrete rule
 
     + ConcreteRule: instantiated rule, concrete param list
+    + AllRuleInst: all instances of the rule has same relation
 *)
 type concrete_rule =
   | ConcreteRule of string * paramref list
+  | AllRuleInst of string
 with sexp
 
 val concrete_rule : rule -> paramref list -> concrete_rule
+val all_rule_inst : rule -> concrete_rule
+
+val all_rule_inst_from_name : string -> concrete_rule
+
+val all_rule_inst_from_cr : concrete_rule -> concrete_rule
 
 (** Concrete property
 

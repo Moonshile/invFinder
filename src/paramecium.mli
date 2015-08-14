@@ -245,6 +245,11 @@ end
 
 
 
+module VarNamesOfAssigns : sig
+  val of_statement : statement -> String.Set.t
+  val of_rule : rule -> String.Set.t
+end
+
 
 
 

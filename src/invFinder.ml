@@ -9,6 +9,7 @@ open Formula
 open Paramecium
 
 open Core.Std
+open Re2
 
 (** Raised when parallel statements haven't been cast to assign list *)
 exception Unexhausted_flat_parallel
@@ -22,14 +23,30 @@ exception Parameter_overflow
 (** Concrete rule
 
     + ConcreteRule: instantiated rule, concrete param list
+    + AllRuleInst: all instances of the rule has same relation
 *)
 type concrete_rule =
   | ConcreteRule of string * paramref list
+  | AllRuleInst of string
 with sexp
 
 let concrete_rule r ps =
   let Rule(name, _, _, _) = r in
   ConcreteRule(name, ps)
+
+let all_rule_inst r =
+  let Rule(name, _, _, _) = r in
+  AllRuleInst(name)
+
+let all_rule_inst_from_name n =
+  AllRuleInst(n)
+
+let get_rname_of_crname crname =
+  Regex.rewrite_exn (Regex.of_string "\\[.+?\\]") ~template:"" crname
+
+let all_rule_inst_from_cr cr =
+  let ConcreteRule(name, _) = cr in
+  AllRuleInst(get_rname_of_crname name)
 
 (** Concrete property
 
@@ -69,6 +86,15 @@ with sexp
 let type_defs = ref []
 let protocol_name = ref ""
 let rule_table = Hashtbl.create ~hashable:String.hashable ()
+let rule_vars_table = Hashtbl.create ~hashable:String.hashable ()
+
+let rec cache_vars_of_rules rs =
+  match rs with
+  | [] -> ()
+  | r::rs' ->
+    let Rule(key, _, _, _) = r in
+    Hashtbl.replace rule_vars_table ~key ~data:(VarNamesOfAssigns.of_rule r);
+    cache_vars_of_rules rs'
 
 (* Convert statements to a list of assignments *)
 let rec statement_2_assigns statement =
@@ -134,7 +160,11 @@ let relation_2_str relation =
 
 (** Convert t to a string *)
 let to_str {rule; inv; branch; relation} =
-  let ConcreteRule(rname, _) = rule in
+  let rname =
+    match rule with
+    | ConcreteRule(rname, _)
+    | AllRuleInst(rname) -> rname
+  in
   let inv_str = ToStr.Smv.form_act (concrete_prop_2_form inv) in
   let branch_str = ToStr.Smv.form_act branch in
   let rel_str = relation_2_str relation in
@@ -673,8 +703,18 @@ let fix_relations_with_cinvs cinvs relations =
   wrapper relations []
 
 let get_res_of_cinv cinv rname_paraminfo_pairs =
-  let (ConcreteProp(Prop(_, prop_pds, _), _)) = cinv in
-  let rule_inst_names = compute_rule_inst_names rname_paraminfo_pairs prop_pds in
+  let (ConcreteProp(Prop(_, prop_pds, form), _)) = cinv in
+  let vars_of_cinv = VarNames.of_form form in
+  let rule_names = List.filter (Hashtbl.keys rule_vars_table) ~f:(fun rn ->
+    String.Set.is_empty (String.Set.inter vars_of_cinv (Hashtbl.find_exn rule_vars_table rn))
+  ) in
+  let rule_inst_names = 
+    compute_rule_inst_names rname_paraminfo_pairs prop_pds
+    |> List.filter ~f:(fun crn -> all rule_names ~f:(fun n -> not (get_rname_of_crname crn = n)))
+  in
+  let relations_of_hold2 = List.map rule_names ~f:(fun rn -> 
+    deal_with_case_2 (all_rule_inst_from_name rn) cinv chaos
+  ) in
   let crules = 
     List.map rule_inst_names ~f:(fun n -> 
       match Hashtbl.find rule_table n with
@@ -688,7 +728,7 @@ let get_res_of_cinv cinv rname_paraminfo_pairs =
     |> List.unzip
   in
   let cinvs = InvLib.add_many (List.concat new_invs) in
-  cinvs, fix_relations_with_cinvs cinvs new_relations
+  cinvs, fix_relations_with_cinvs cinvs new_relations@relations_of_hold2
 
 let read_res_cache cinvs =
   let cinvs' = Storage.get (!protocol_name) "cinvs" cinvs (List.t_of_sexp concrete_prop_of_sexp) in
@@ -774,7 +814,9 @@ let find ?(smv="") ?(smv_bmc="") ?(murphi="") protocol =
     if smv = "" then Smv.set_context name (Loach.ToSmv.protocol_act protocol)
     else begin Smv.set_context name smv end
   in
-  (type_defs := types; protocol_name := name);
+  type_defs := types;
+  protocol_name := name;
+  cache_vars_of_rules rules;
   let cinvs =
     let invs = List.concat (List.map properties ~f:simplify_prop) in
     let indice = up_to (List.length invs) in
