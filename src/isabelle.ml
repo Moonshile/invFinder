@@ -270,6 +270,16 @@ let inits_act statements =
 
 
 
+
+
+
+
+
+
+
+
+
+
 let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varnames relations =
   types_ref := types;
   let types_str = String.concat ~sep:"\n" (List.filter_map types ~f:type_act) in

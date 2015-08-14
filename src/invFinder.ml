@@ -663,13 +663,13 @@ let tabular_expans (Rule(_name, _, form, _), crule, _, assigns) ~cinv =
 
 
 let compute_rule_inst_names rname_paraminfo_pairs prop_pds =
-  List.concat (List.map rname_paraminfo_pairs ~f:(fun (rname, rpds) ->
+  List.map rname_paraminfo_pairs ~f:(fun (rname, rpds) ->
     match rpds with
     | [] -> [rname]
     | _ ->
       SemiPerm.gen_paramfixes prop_pds rpds
       |> List.map ~f:(fun pfs -> get_rule_inst_name rname pfs)
-  ))
+  )
 
 let fix_relations_with_cinvs cinvs relations =
   let pairs = List.map cinvs ~f:(fun cinv -> concrete_prop_2_form cinv, cinv) in
@@ -697,7 +697,7 @@ let fix_relations_with_cinvs cinvs relations =
       in
       wrapper relations' (res@[fixed])
   in
-  wrapper relations []
+  List.map relations ~f:(fun rels -> List.map rels ~f:(fun rs -> wrapper rs []))
 
 let get_res_of_cinv cinv rname_paraminfo_pairs =
   let (ConcreteProp(Prop(_, prop_pds, form), _)) = cinv in
@@ -705,26 +705,34 @@ let get_res_of_cinv cinv rname_paraminfo_pairs =
   let rule_names = List.filter (Hashtbl.keys rule_vars_table) ~f:(fun rn ->
     String.Set.is_empty (String.Set.inter vars_of_cinv (Hashtbl.find_exn rule_vars_table rn))
   ) in
+  let relations_of_hold2 = List.map rule_names ~f:(fun rn -> 
+    [[deal_with_case_2 (all_rule_inst_from_name rn) cinv chaos]]
+  ) in
   let rule_inst_names = 
     compute_rule_inst_names rname_paraminfo_pairs prop_pds
-    |> List.filter ~f:(fun crn -> all rule_names ~f:(fun n -> not (get_rname_of_crname crn = n)))
+    |> List.filter ~f:(fun crns ->
+      match crns with
+      | [] -> raise Empty_exception
+      | crn::_ -> all rule_names ~f:(fun n -> not (get_rname_of_crname crn = n)))
   in
-  let relations_of_hold2 = List.map rule_names ~f:(fun rn -> 
-    deal_with_case_2 (all_rule_inst_from_name rn) cinv chaos
-  ) in
   let crules = 
-    List.map rule_inst_names ~f:(fun n -> 
-      match Hashtbl.find rule_table n with
-      | None -> Prt.error n; raise Empty_exception
-      | Some(cr) -> cr
+    List.map rule_inst_names ~f:(fun ns ->
+      List.map ns ~f:(fun n ->
+        match Hashtbl.find rule_table n with
+        | None -> Prt.error n; raise Empty_exception
+        | Some(cr) -> cr
+      )
     )
   in
   let new_invs, new_relations =
-    List.map crules ~f:(tabular_expans ~cinv)
-    |> List.concat
-    |> List.unzip
+  let invs, rels = List.unzip (List.map crules ~f:(fun r_insts ->
+      List. unzip (List.map r_insts ~f:(fun r_inst ->
+        List.unzip (tabular_expans r_inst ~cinv)
+      ))
+    )) in
+    List.concat (List.concat (List.concat invs)), rels
   in
-  let cinvs = InvLib.add_many (List.concat new_invs) in
+  let cinvs = InvLib.add_many new_invs in
   cinvs, fix_relations_with_cinvs cinvs new_relations@relations_of_hold2
 
 let read_res_cache cinvs =
@@ -735,17 +743,21 @@ let read_res_cache cinvs =
     let tuple2s = Storage.get (!protocol_name) "invlib" default convertor in
     List.map tuple2s ~f:(fun t -> Tuple2.get1 t, Tuple2.get2 t)
   in
-  let relations = Storage.get_many (!protocol_name) "relations" [] t_of_sexp in
+  let relations =
+    let convertor = List.t_of_sexp (List.t_of_sexp t_of_sexp) in
+    Storage.get_many (!protocol_name) "relations" [] convertor
+  in
   InvLib.pairs := inv_cinv_pairs;
   InvLib.index := List.length inv_cinv_pairs;
   (cinvs', relations)
 
 let write_res_cache cinvs new_relations =
   let tuple2s = List.map (!InvLib.pairs) ~f:(fun (f, cinv) -> Tuple2.create f cinv) in
-  let convertor = List.sexp_of_t (Tuple2.sexp_of_t sexp_of_formula sexp_of_concrete_prop) in
+  let invlib_convertor = List.sexp_of_t (Tuple2.sexp_of_t sexp_of_formula sexp_of_concrete_prop) in
+  let rel_convertor = List.sexp_of_t (List.sexp_of_t sexp_of_t) in
   Storage.replace (!protocol_name) "cinvs" cinvs (List.sexp_of_t sexp_of_concrete_prop);
-  Storage.replace (!protocol_name) "invlib" tuple2s convertor;
-  Storage.add_many (!protocol_name) "relations" new_relations sexp_of_t;;
+  Storage.replace (!protocol_name) "invlib" tuple2s invlib_convertor;
+  Storage.add_many (!protocol_name) "relations" new_relations rel_convertor;;
 
 (* Find new inv and relations with concrete rules and a concrete invariant *)
 let tabular_rules_cinvs rname_paraminfo_pairs cinvs =
@@ -850,4 +862,5 @@ let find ?(smv="") ?(smv_bmc="") ?(murphi="") protocol =
   let rname_paraminfo_pairs = List.map rules ~f:get_rulename_param_pair in
   let (cinvs, relations) = tabular_rules_cinvs rname_paraminfo_pairs cinvs in
   let cinvs_with_inits = check_invs_on_init cinvs init in
-  printf "%s\n" (result_to_str (cinvs, relations)); (cinvs_with_inits, relations)
+  printf "%s\n" (result_to_str (cinvs, List.concat (List.concat (relations))));
+  (cinvs_with_inits, relations)
