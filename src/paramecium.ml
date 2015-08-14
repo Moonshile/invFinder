@@ -348,7 +348,7 @@ module VarNames = struct
   (** Names of var *)
   let of_var v =
     let Arr(ls) = v in
-    of_list (List.map ls ~f:(fun (n, _) -> n))
+    of_list [String.concat ~sep:"." (List.map ls ~f:(fun (n, _) -> n))]
 
   (** Names of exp *)
   let rec of_exp e =

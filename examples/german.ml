@@ -167,7 +167,7 @@ let protocol = {
 }
 
 let () = run_with_cmdline (fun () -> 
-  let cinvs, relations = find protocol in
+  let cinvs_with_varnames, relations = find protocol in
   ()
 )
 

@@ -20,6 +20,8 @@ exception Circular_parallel_assign
 (** Raised when require to check a inv has too many paramters *)
 exception Parameter_overflow
 
+exception Invariant_not_sat_on_init of string
+
 (** Concrete rule
 
     + ConcreteRule: instantiated rule, concrete param list
@@ -40,13 +42,6 @@ let all_rule_inst r =
 
 let all_rule_inst_from_name n =
   AllRuleInst(n)
-
-let get_rname_of_crname crname =
-  Regex.rewrite_exn (Regex.of_string "\\[.+?\\]") ~template:"" crname
-
-let all_rule_inst_from_cr cr =
-  let ConcreteRule(name, _) = cr in
-  AllRuleInst(get_rname_of_crname name)
 
 (** Concrete property
 
@@ -87,6 +82,9 @@ let type_defs = ref []
 let protocol_name = ref ""
 let rule_table = Hashtbl.create ~hashable:String.hashable ()
 let rule_vars_table = Hashtbl.create ~hashable:String.hashable ()
+
+let get_rname_of_crname crname =
+  Regex.rewrite_exn (Regex.of_string "\\[.+?\\]") ~template:"" crname
 
 let rec cache_vars_of_rules rs =
   match rs with
@@ -643,7 +641,6 @@ let tabular_expans (Rule(_name, _, form, _), crule, _, assigns) ~cinv =
     pre_cond inv_inst assigns
     |> List.map ~f:(fun (g, o) -> g, simplify o)
   in
-  (*Prt.warning (_name^": "^ToStr.Smv.form_act obligation^", "^ToStr.Smv.form_act inv_inst^"\n");*)
   let rec deal_with_case obligations relations =
     match obligations with
     | [] -> relations
@@ -785,6 +782,28 @@ let simplify_prop property =
   |> List.filter ~f:(fun x -> match x with | Miracle -> false | _ -> true)
   |> List.dedup ~compare:symmetry_form
 
+
+
+
+let check_invs_on_init cinvs init =
+  let assigns = statement_2_assigns init in
+  List.map cinvs ~f:(fun cinv ->
+    let inv = concrete_prop_2_form cinv in
+    cinv, List.filter assigns ~f:(fun assign ->
+      let res = List.map (form_eval inv ~assigns:[assign]) ~f:(fun (g, f) -> andList [g; f]) in
+      let has_false = List.exists res ~f:(fun f -> is_tautology f) in
+      if has_false then
+        raise (Invariant_not_sat_on_init(ToStr.Smv.form_act inv))
+      else
+        List.exists res ~f:(fun f -> is_tautology (neg f))
+    )
+    |> List.map ~f:(fun (v, _) -> VarNames.of_var v)
+    |> String.Set.union_list
+  )
+
+
+
+
 let result_to_str (cinvs, relations) =
   let invs_str =
     cinvs
@@ -802,7 +821,7 @@ let result_to_str (cinvs, relations) =
     @return causal relation table
 *)
 let find ?(smv="") ?(smv_bmc="") ?(murphi="") protocol =
-  let {name; types; vardefs; init=_init; rules; properties} = Loach.Trans.act ~loach:protocol in
+  let {name; types; vardefs; init; rules; properties} = Loach.Trans.act ~loach:protocol in
   let _smt_context = Smt.set_context name (ToStr.Smt2.context_of ~types ~vardefs) in
   let _mu_context = Murphi.set_context name murphi in
   let _smv_bmc_context =
@@ -829,5 +848,6 @@ let find ?(smv="") ?(smv_bmc="") ?(murphi="") protocol =
     (rname, paramdefs)
   in
   let rname_paraminfo_pairs = List.map rules ~f:get_rulename_param_pair in
-  let result = tabular_rules_cinvs rname_paraminfo_pairs cinvs in
-  printf "%s\n" (result_to_str result); result
+  let (cinvs, relations) = tabular_rules_cinvs rname_paraminfo_pairs cinvs in
+  let cinvs_with_inits = check_invs_on_init cinvs init in
+  printf "%s\n" (result_to_str (cinvs, relations)); (cinvs_with_inits, relations)

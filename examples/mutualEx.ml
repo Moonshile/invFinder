@@ -79,6 +79,7 @@ let protocol = {
 }
 
 let () = run_with_cmdline (fun () ->
-  let cinvs, relations = find ~murphi:(In_channel.read_all "n_mutualEx.m") protocol in
-  Out_channel.write_all (sprintf "%s.thy" protocol.name) (Isabelle.protocol_act protocol cinvs relations)
+  let cinvs_with_varnames, relations = find ~murphi:(In_channel.read_all "n_mutualEx.m") protocol in
+  let filename = sprintf "%s.thy" protocol.name in
+  Out_channel.write_all filename (Isabelle.protocol_act protocol cinvs_with_varnames relations)
 )

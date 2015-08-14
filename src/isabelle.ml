@@ -1,3 +1,8 @@
+(** Generate Isabelle code
+
+    @author Yongjian Li <lyj238@gmail.com>
+    @author Kaiqiang Duan <duankq@ios.ac.cn>
+*)
 
 
 open Utils
@@ -55,13 +60,14 @@ let paramref_to_index pr =
     | _ -> raise (Unsupported("Non-integer indexes are not supported yet"))
   )
 
-let exp_act e =
+let rec exp_act e =
   match e with
   | Const(c) -> sprintf "(Const %s)" (const_to_str c)
   | Var(v) -> sprintf "(IVar %s)" (var_act v)
   | Param(pr) -> sprintf "(Const (index %s))" (paramref_to_index pr)
-
-let rec formula_act f =
+  | Ite(f, e1, e2) -> sprintf "(iteForm %s %s %s)"
+    (formula_act f) (exp_act e1) (exp_act e2)
+and formula_act f =
   match f with
   | Chaos -> "chaos"
   | Miracle -> "miracle"
@@ -264,10 +270,11 @@ let inits_act statements =
 
 
 
-let protocol_act {name; types; vardefs; init; rules; properties} cinvs relations =
+let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varnames relations =
   types_ref := types;
   let types_str = String.concat ~sep:"\n" (List.filter_map types ~f:type_act) in
   let rules_str = rules_act rules in
+  let (cinvs, _) = List.unzip cinvs_with_varnames in
   let invs_str = invs_act cinvs in
   let inits_str = inits_act init in
   sprintf "\

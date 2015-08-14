@@ -174,7 +174,7 @@ let protocol = {
 }
 
 let () = run_with_cmdline (fun () ->
-  let cinvs, relations = find protocol
+  let cinvs_with_varnames, relations = find protocol
     ~murphi:(In_channel.read_all "n_g2kLyj.m")
   in
   ()

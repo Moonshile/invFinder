@@ -400,7 +400,7 @@ let protocol = {
 }
 
 let () = run_with_cmdline (fun () ->
-  let cinvs, relations = find ~murphi:(In_channel.read_all "n_flash_nodata.m") protocol in
+  let cinvs_with_varnames, relations = find ~murphi:(In_channel.read_all "n_flash_nodata.m") protocol in
   ()
 )
 
