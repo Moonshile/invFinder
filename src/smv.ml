@@ -15,8 +15,11 @@ let protocol_name = ref ""
 
 let table = Hashtbl.create ~hashable:String.hashable ()
 
-let set_context name smv_file_content =
+let escape_func = ref (fun inv_str -> inv_str)
+
+let set_context ?(escape=(fun inv_str -> inv_str)) name smv_file_content =
   protocol_name := name;
+  escape_func := escape;
   let _res = Client.Smv.compute_reachable name smv_file_content in
   let diameter = ref 0 in
   while !diameter = 0 do
@@ -33,6 +36,7 @@ let set_context name smv_file_content =
     @return true if is true invariant else false
 *)
 let is_inv ?(quiet=true) inv =
+  let inv = (!escape_func) inv in
   match Hashtbl.find table inv with
   | Some (r) -> r
   | None -> 

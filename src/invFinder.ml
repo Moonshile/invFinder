@@ -832,7 +832,7 @@ let result_to_str (cinvs, relations) =
     @param prop_params property parameters given
     @return causal relation table
 *)
-let find ?(smv="") ?(smv_bmc="") ?(murphi="") protocol =
+let find ?(smv_escape=(fun inv_str -> inv_str)) ?(smv="") ?(smv_bmc="") ?(murphi="") protocol =
   let {name; types; vardefs; init; rules; properties} = Loach.Trans.act ~loach:protocol in
   let _smt_context = Smt.set_context name (ToStr.Smt2.context_of ~types ~vardefs) in
   let _mu_context = Murphi.set_context name murphi in
@@ -842,8 +842,8 @@ let find ?(smv="") ?(smv_bmc="") ?(murphi="") protocol =
     else begin SmvBmc.set_context name smv_bmc end
   in
   let _smv_context =
-    if smv = "" then Smv.set_context name (Loach.ToSmv.protocol_act protocol)
-    else begin Smv.set_context name smv end
+    if smv = "" then Smv.set_context ~escape:smv_escape name (Loach.ToSmv.protocol_act protocol)
+    else begin Smv.set_context ~escape:smv_escape name smv end
   in
   type_defs := types;
   protocol_name := name;
