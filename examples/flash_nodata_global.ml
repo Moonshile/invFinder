@@ -415,6 +415,23 @@ let protocol = {
 let () = run_with_cmdline (fun () ->
   let cinvs_with_varnames, relations = find protocol
     ~murphi:(In_channel.read_all "n_flash_nodata_global.m")
+    ~smv:(In_channel.read_all "flash_nodata.smv")
+    ~smv_escape:(fun inv_str ->
+      let replace s d =
+        Re2.Regex.rewrite_exn (Re2.Regex.of_string s) ~template:d
+      in
+      inv_str
+      |> replace "HomeHeadPtr = FALSE" "HeadPtr != 0"
+      |> replace "HomeHeadPtr = TRUE" "HeadPtr = 0"
+      |> replace "HomeShrSet" "ShrSet[0]"
+      |> replace "HomeInvSet" "InvSet[0]"
+      |> replace "HomeProc = FALSE" "Proc != 0"
+      |> replace "HomeProc = TRUE" "Proc = 0"
+      |> replace "HomeProc\\." "Proc[0]."
+      |> replace "HomeUniMsg" "UniMsg[0]"
+      |> replace "HomeInvMsg" "InvMsg[0]"
+      |> replace "HomeRpMsg" "RpMsg[0]"
+    )
   in
   ()
 )
