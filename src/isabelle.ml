@@ -477,7 +477,7 @@ let gen_lemma relations rules =
 "lemma %sVs%s:
 assumes a1: \"\\<exists> %s. %s\" and
 a2: \"\\<exists> %s. %s\"
-shows \"invHoldForRule f r (invariants N)\"
+shows \"invHoldForRule's f r (invariants N)\" (is \"?P1 s \\<or> ?P2 s \\<or> ?P3 s\")
 proof -
 from a1 obtain %s where
   a1:\"%s\"
