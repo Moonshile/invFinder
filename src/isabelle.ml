@@ -16,9 +16,94 @@ exception Unsupported of string
 
 let types_ref = ref []
 
+
+
+
+
+
+
+
+let analyze_rels_among_pfs pfs_lists =
+  let rec wrapper pfs_lists res =
+    match pfs_lists with
+    | [] -> raise Empty_exception (*TODO*)
+    | [_] -> res
+    | pfs_list::pfs_lists' ->
+      let r = String.concat ~sep:"\\<and>" (List.map pfs_list ~f:(fun (Paramfix(vn, tn, c)) ->
+        String.concat ~sep:"\\<and>" (List.map (List.concat pfs_lists') ~f:(fun pf' ->
+          let Paramfix(vn', tn', c') = pf' in
+          if tn = tn' then
+            match c = c' with
+            | true -> sprintf "%s=%s" vn vn'
+            | false -> sprintf "%s~=%s" vn vn'
+          else begin
+            ""
+          end
+        ))
+      )) in
+      wrapper pfs_lists' (res@[r])
+  in
+  String.concat ~sep:"\\<and>" (wrapper pfs_lists [])
+
+let get_pf_name_list pfs =
+  String.concat ~sep:" " (List.map pfs ~f:(fun pf ->
+    let Paramfix(vn, _, _) = pf in vn
+  ))
+
+let analyze_rels_in_pfs t name pfs =
+  let pfs_str_of_a_type pfs =
+    let part1 = List.map pfs ~f:(fun pf ->
+      let Paramfix(vn, _, _) = pf in sprintf "%s\\<le>N" vn
+    ) in
+    let pairs = combination pfs 2 in
+    let part2 = List.map pairs ~f:(fun [pf1; pf2] ->
+      let Paramfix(vn1, _, _), Paramfix(vn2, _, _) = pf1, pf2 in sprintf "%s~=%s" vn1 vn2
+    ) in
+    String.concat ~sep:"\\<and>" (part1@part2)
+  in
+  let param_str_part =
+    partition pfs ~f:(fun (Paramfix(_, tn, _)) -> tn)
+    |> List.map ~f:pfs_str_of_a_type
+    |> String.concat ~sep:"\\<and>"
+  in
+  sprintf "%s\\<and>%s=name %s" param_str_part t (get_pf_name_list pfs)
+
+let get_pd_name_list pds =
+  String.concat ~sep:" " (List.map pds ~f:(fun pd ->
+    let Paramdef(vn, _) = pd in vn
+  ))
+
+let analyze_rels_in_pds t name pds =
+  let pds_str_of_a_type pds =
+    let part1 = List.map pds ~f:(fun pd ->
+      let Paramdef(vn, _) = pd in sprintf "%s\\<le>N" vn
+    ) in
+    let pairs = combination pds 2 in
+    let part2 = List.map pairs ~f:(fun [pd1; pd2] ->
+      let Paramdef(vn1, _), Paramdef(vn2, _) = pd1, pd2 in sprintf "%s~=%s" vn1 vn2
+    ) in
+    String.concat ~sep:"\\<and>" (part1@part2)
+  in
+  let param_str_part =
+    partition pds ~f:(fun (Paramdef(_, tn)) -> tn)
+    |> List.map ~f:pds_str_of_a_type
+    |> String.concat ~sep:"\\<and>"
+  in
+  sprintf "%s\\<and>%s=name %s" param_str_part t (get_pd_name_list pds)
+
 let gen_tmp_vars n =
   let nums = up_to n in
   List.map nums ~f:(fun i -> sprintf "i%d" i)
+
+
+
+
+
+
+
+
+
+
 
 let const_act c =
   match c with
@@ -162,10 +247,9 @@ let rule_act r =
 let rules_act rs =
   let rstrs = String.concat ~sep:"\n\n" (List.map rs ~f:rule_act) in
   let r_insts_str = String.concat ~sep:" \\<or>\n" (
-    List.map rs ~f:(fun (Rule(name, pd, _, _)) ->
-      let n = List.length pd in
-      let tmp_vars = String.concat (List.map (gen_tmp_vars n) ~f:(fun t -> sprintf "%%%s." t)) in
-      sprintf "ex%dP N (%% %s. r=%s %s)" n tmp_vars name tmp_vars
+    List.map rs ~f:(fun (Rule(name, pds, _, _)) ->
+      let tmp_vars = get_pd_name_list pds in
+      sprintf "ex%dP N (%% %s. r=%s %s)" (List.length pds) tmp_vars name tmp_vars
     )
   ) in
   sprintf "%s\n\ndefinition rules::\"nat \\<Rightarrow> rule set\" where [simp]:
@@ -321,81 +405,6 @@ module ToIsabelle = struct
     | Imply(f1, f2) -> sprintf "(%s)\\<rightarrow>(%s)" (form_act f1) (form_act f2)
 
 end
-
-
-
-
-
-
-
-
-let analyze_rels_among_pfs pfs_lists =
-  let rec wrapper pfs_lists res =
-    match pfs_lists with
-    | [] -> raise Empty_exception (*TODO*)
-    | [_] -> res
-    | pfs_list::pfs_lists' ->
-      let r = String.concat ~sep:"\\<and>" (List.map pfs_list ~f:(fun (Paramfix(vn, tn, c)) ->
-        String.concat ~sep:"\\<and>" (List.map (List.concat pfs_lists') ~f:(fun pf' ->
-          let Paramfix(vn', tn', c') = pf' in
-          if tn = tn' then
-            match c = c' with
-            | true -> sprintf "%s=%s" vn vn'
-            | false -> sprintf "%s~=%s" vn vn'
-          else begin
-            ""
-          end
-        ))
-      )) in
-      wrapper pfs_lists' (res@[r])
-  in
-  String.concat ~sep:"\\<and>" (wrapper pfs_lists [])
-
-let get_pf_name_list pfs =
-  String.concat ~sep:" " (List.map pfs ~f:(fun pf ->
-    let Paramfix(vn, _, _) = pf in vn
-  ))
-
-let analyze_rels_in_pfs t name pfs =
-  let pfs_str_of_a_type pfs =
-    let part1 = String.concat ~sep:"\\<and>" (List.map pfs ~f:(fun pf ->
-      let Paramfix(vn, _, _) = pf in sprintf "%s\\<le>N" vn
-    )) in
-    let pairs = combination pfs 2 in
-    let part2 = String.concat ~sep:"\\<and>" (List.map pairs ~f:(fun [pf1; pf2] ->
-      let Paramfix(vn1, _, _), Paramfix(vn2, _, _) = pf1, pf2 in sprintf "%s~=%s" vn1 vn2
-    )) in
-    sprintf "%s\\<and>%s" part1 part2
-  in
-  let param_str_part =
-    partition pfs ~f:(fun (Paramfix(_, tn, _)) -> tn)
-    |> List.map ~f:pfs_str_of_a_type
-    |> String.concat ~sep:"\\<and>"
-  in
-  sprintf "%s\\<and>%s=name %s" param_str_part t (get_pf_name_list pfs)
-
-let get_pd_name_list pds =
-  String.concat ~sep:" " (List.map pds ~f:(fun pd ->
-    let Paramdef(vn, _) = pd in vn
-  ))
-
-let analyze_rels_in_pds t name pds =
-  let pds_str_of_a_type pds =
-    let part1 = String.concat ~sep:"\\<and>" (List.map pds ~f:(fun pd ->
-      let Paramdef(vn, _) = pd in sprintf "%s\\<le>N" vn
-    )) in
-    let pairs = combination pds 2 in
-    let part2 = String.concat ~sep:"\\<and>" (List.map pairs ~f:(fun [pd1; pd2] ->
-      let Paramdef(vn1, _), Paramdef(vn2, _) = pd1, pd2 in sprintf "%s~=%s" vn1 vn2
-    )) in
-    sprintf "%s\\<and>%s" part1 part2
-  in
-  let param_str_part =
-    partition pds ~f:(fun (Paramdef(_, tn)) -> tn)
-    |> List.map ~f:pds_str_of_a_type
-    |> String.concat ~sep:"\\<and>"
-  in
-  sprintf "%s\\<and>%s=name %s" param_str_part t (get_pd_name_list pds)
 
 
 
