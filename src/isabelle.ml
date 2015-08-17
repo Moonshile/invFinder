@@ -299,9 +299,8 @@ let invs_act cinvs =
   let invs_with_pd_count = List.map cinvs ~f:inv_act in
   let inv_strs = String.concat ~sep:"\n\n" (List.map invs_with_pd_count ~f:(fun (_, _, s) -> s)) in
   let inv_insts_str = String.concat ~sep:" \\<or>\n" (
-    List.map invs_with_pd_count ~f:(fun (name, pd_c, _) ->
-      let tmp_vars = String.concat ~sep:" " (List.map (gen_tmp_vars pd_c) ~f:(fun t -> sprintf "%s" t)) in
-      sprintf "ex%dP N (%% %s. f=%s %s)" pd_c tmp_vars name tmp_vars
+    List.map cinvs ~f:(fun (ConcreteProp(Prop(name, pds, _), _)) ->
+      sprintf "\\<exists> %s. %s" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds)
     )
   ) in
   sprintf "%s\n\ndefinition invariants::\"nat \\<Rightarrow> formula set\" where [simp]:
