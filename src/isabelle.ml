@@ -288,7 +288,7 @@ let inv_act cinv =
   let inv_type = sprintf "%s \\<Rightarrow> formula" pd_str in
   let pd_names = String.concat ~sep:" " (List.map pds' ~f:(fun (Paramdef(n, _)) -> n)) in
   name, List.length pds', sprintf "definition %s::\"%s\" where [simp]:
-\"%s %s \\<equiv>\n%s\"" name inv_type name pd_names (formula_act gened_inv'')
+\"%s %s \\<equiv>\n%s\"" name inv_type name pd_names (formula_act (neg gened_inv''))
 
 let invs_act cinvs =
   let invs_with_pd_count = List.map cinvs ~f:inv_act in
@@ -388,8 +388,8 @@ module ToIsabelle = struct
 
   let rec form_act f =
     match f with
-    | Paramecium.Chaos -> "true"
-    | Miracle -> "false"
+    | Paramecium.Chaos -> "True"
+    | Miracle -> "False"
     | Eqn(e1, e2) -> sprintf "%s=%s" (exp_act e1) (exp_act e2)
     | Neg(f) -> sprintf "\\<not>(%s)" (form_act f)
     | AndList(fl) ->
@@ -409,19 +409,19 @@ end
 
 
 let gen_case_1 =
-"    have \"invHoldForRule1 f r (invariants N)\"
+"    have \"?P1 s\"
     proof(cut_tac a1 a2 b1 c1, auto) qed
     then have \"invHoldForRule f r (invariants N)\" by auto"
 
 let gen_case_2 =
-"    have \"invHoldForRule2 f r (invariants N)\"
+"    have \"?P2 s\"
     proof(cut_tac a1 a2 b1 c1, auto) qed
     then have \"invHoldForRule f r (invariants N)\" by auto"
 
 let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
   let form_isabelle = ToIsabelle.form_act f in
   sprintf
-"    have \"invHoldForRule3 f r (invariants N)\"
+"    have \"?P3 s\"
     proof(cut_tac a1 a2 b1 c1, simp, rule_tac x=%s in exI, auto) qed
     then have \"invHoldForRule f r (invariants N)\" by auto" form_isabelle
 
@@ -446,7 +446,7 @@ let gen_inst relations condition =
   assume b1: \"%s\"
   have \"%s\" by auto
 %s
-  ultimately have \"invHoldForRule f r (invariants N)\" by auto
+  ultimately have \"invHoldForRule's f r (invariants N)\" by auto
 }" condition (String.concat ~sep:"\\<and>" branches) (String.concat ~sep:"\n" moreovers)
 
 let analyze_lemma rels pfs_prop =
@@ -487,7 +487,7 @@ from a2 obtain %s where
 by blast
 have \"%s\" by auto
 %s
-ultimately show \"invHoldForRule f r (invariants N)\" by auto
+ultimately show \"invHoldForRule's f r (invariants N)\" by auto
 qed"
     rn pn
     (get_pf_name_list pfs_r) (analyze_rels_in_pfs "r" rn pfs_r)
