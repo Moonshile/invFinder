@@ -248,8 +248,7 @@ let rules_act rs =
   let rstrs = String.concat ~sep:"\n\n" (List.map rs ~f:rule_act) in
   let r_insts_str = String.concat ~sep:" \\<or>\n" (
     List.map rs ~f:(fun (Rule(name, pds, _, _)) ->
-      let tmp_vars = get_pd_name_list pds in
-      sprintf "ex%dP N (%% %s. r=%s %s)" (List.length pds) tmp_vars name tmp_vars
+      sprintf "\\<exists> %s. %s" (get_pd_name_list pds) (analyze_rels_in_pds "r" name pds)
     )
   ) in
   sprintf "%s\n\ndefinition rules::\"nat \\<Rightarrow> rule set\" where [simp]:
