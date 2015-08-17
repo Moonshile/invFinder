@@ -602,12 +602,12 @@ let gen_main rules invs =
 "lemma main:
 assumes a1: \"s \\<in> reachableSet {allInitSpecs N} (rules N)\"
 and a2: \"0 < N\"
-shows \"\\<forall> inv. inv \\<in> (invariants N) formEval inv s\"
+shows \"\\<forall> inv. inv \\<in> (invariants N) --> formEval inv s\"
 proof (rule consistentLemma)
 show \"newconsistent (invariants N) {andList (allInitSpecs N)} (rules N)\"
 proof (cut_tac a1, unfold newconsistent_def, rule conjI)
-show \"\\<forall> inv ini s. inv \\<in> (invariants N) ini \\<in> {andList (allInitSpecs N)} \
-formEval ini s formEval inv s\"
+show \"\\<forall> inv ini s. inv \\<in> (invariants N) --> ini \\<in> {andList (allInitSpecs N)} \
+--> formEval ini s --> formEval inv s\"
 proof ((rule allI)+, (rule impI)+)
   fix inv ini s
   assume b1: \"inv \\<in> (invariants N)\" and b2: \"ini \\<in> {andList (allInitSpecs N)}\" \
