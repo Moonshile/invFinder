@@ -14,7 +14,7 @@ let table = Hashtbl.create ~hashable:String.hashable ()
 let base_index = ref 0
 
 let next_name () = 
-  let res = sprintf "__pInv%d__" (!base_index) in
+  let res = sprintf "p__Inv%d" (!base_index) in
   incr base_index; res
 
 (** Convert paramref *)

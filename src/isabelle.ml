@@ -16,13 +16,6 @@ exception Unsupported of string
 
 let types_ref = ref []
 
-
-
-
-
-
-
-
 let analyze_rels_among_pfs pfs_lists =
   let rec wrapper pfs_lists res =
     match pfs_lists with
@@ -66,7 +59,7 @@ let analyze_rels_in_pfs t name pfs =
     |> List.map ~f:pfs_str_of_a_type
     |> String.concat ~sep:"\\<and>"
   in
-  sprintf "%s\\<and>%s=name %s" param_str_part t (get_pf_name_list pfs)
+  sprintf "%s\\<and>%s=%s %s" param_str_part t name (get_pf_name_list pfs)
 
 let get_pd_name_list pds =
   String.concat ~sep:" " (List.map pds ~f:(fun pd ->
@@ -89,7 +82,7 @@ let analyze_rels_in_pds t name pds =
     |> List.map ~f:pds_str_of_a_type
     |> String.concat ~sep:"\\<and>"
   in
-  sprintf "%s\\<and>%s=name %s" param_str_part t (get_pd_name_list pds)
+  sprintf "%s\\<and>%s=%s %s" param_str_part t name (get_pd_name_list pds)
 
 let gen_tmp_vars n =
   let nums = up_to n in
