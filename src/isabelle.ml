@@ -411,19 +411,19 @@ end
 let gen_case_1 =
 "    have \"?P1 s\"
     proof(cut_tac a1 a2 b1 c1, auto) qed
-    then have \"invHoldForRule f r (invariants N)\" by auto"
+    then have \"invHoldForRule' s f r (invariants N)\" by auto"
 
 let gen_case_2 =
 "    have \"?P2 s\"
     proof(cut_tac a1 a2 b1 c1, auto) qed
-    then have \"invHoldForRule f r (invariants N)\" by auto"
+    then have \"invHoldForRule' s f r (invariants N)\" by auto"
 
 let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
   let form_isabelle = ToIsabelle.form_act f in
   sprintf
 "    have \"?P3 s\"
     proof(cut_tac a1 a2 b1 c1, simp, rule_tac x=%s in exI, auto) qed
-    then have \"invHoldForRule f r (invariants N)\" by auto" form_isabelle
+    then have \"invHoldForRule' s f r (invariants N)\" by auto" form_isabelle
 
 let gen_branch branch case =
   sprintf "  moreover {\n    assume c1: \"%s\"\n%s\n  }" branch case
@@ -446,7 +446,7 @@ let gen_inst relations condition =
   assume b1: \"%s\"
   have \"%s\" by auto
 %s
-  ultimately have \"invHoldForRule's f r (invariants N)\" by auto
+  ultimately have \"invHoldForRule' s f r (invariants N)\" by auto
 }" condition (String.concat ~sep:"\\<and>" branches) (String.concat ~sep:"\n" moreovers)
 
 let analyze_lemma rels pfs_prop =
@@ -477,7 +477,7 @@ let gen_lemma relations rules =
 "lemma %sVs%s:
 assumes a1: \"\\<exists> %s. %s\" and
 a2: \"\\<exists> %s. %s\"
-shows \"invHoldForRule's f r (invariants N)\" (is \"?P1 s \\<or> ?P2 s \\<or> ?P3 s\")
+shows \"invHoldForRule' s f r (invariants N)\" (is \"?P1 s \\<or> ?P2 s \\<or> ?P3 s\")
 proof -
 from a1 obtain %s where
   a1:\"%s\"
@@ -487,7 +487,7 @@ from a2 obtain %s where
 by blast
 have \"%s\" by auto
 %s
-ultimately show \"invHoldForRule's f r (invariants N)\" by auto
+ultimately show \"invHoldForRule' s f r (invariants N)\" by auto
 qed"
     rn pn
     (get_pf_name_list pfs_r) (analyze_rels_in_pfs "r" rn pfs_r)
@@ -506,7 +506,7 @@ qed"
 "lemma %sVs%s:
 assumes a1: \"\\<exists> %s. %s\" and
 a2: \"\\<exists> %s. %s\"
-shows \"invHoldForRule f r (invariants N)\"
+shows \"invHoldForRule' s f r (invariants N)\" (is \"?P1 s \\<or> ?P2 s \\<or> ?P3 s\")
 proof -
 by auto
 qed
