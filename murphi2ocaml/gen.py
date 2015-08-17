@@ -734,7 +734,8 @@ let protocol = {
   let cinvs, relations = find protocol
     ~murphi:(In_channel.read_all "%s.m")
   in
-  ()
+  let filename = sprintf "%s.thy" protocol.name in
+  Out_channel.write_all filename (Isabelle.protocol_act protocol cinvs_with_varnames relations)
 )\n'''%(
     types.value, records.value, vardefs.value, init.value, 
     rulesets.value, invs.value, self.name, self.name)

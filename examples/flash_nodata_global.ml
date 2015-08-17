@@ -433,6 +433,7 @@ let () = run_with_cmdline (fun () ->
       |> replace "HomeRpMsg" "RpMsg[0]"
     )
   in
-  ()
+  let filename = sprintf "%s.thy" protocol.name in
+  Out_channel.write_all filename (Isabelle.protocol_act protocol cinvs_with_varnames relations)
 )
 

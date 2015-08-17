@@ -388,7 +388,7 @@ let analyze_rels_among_pfs pfs_lists =
   in
   String.concat ~sep:"\\<and>" (wrapper pfs_lists [])
 
-let get_param_name_list pfs =
+let get_pf_name_list pfs =
   String.concat ~sep:" " (List.map pfs ~f:(fun pf ->
     let Paramfix(vn, _, _) = pf in vn
   ))
@@ -401,7 +401,7 @@ let analyze_rels_in_pfs t name pfs =
   let part2 = String.concat ~sep:"\\<and>" (List.map pairs ~f:(fun [pf1; pf2] ->
     let Paramfix(vn1, _, _), Paramfix(vn2, _, _) = pf1, pf2 in sprintf "%s~=%s" vn1 vn2
   )) in
-  sprintf "%s\\<and>%s\\<and>%s=name %s" part1 part2 t (get_param_name_list pfs)
+  sprintf "%s\\<and>%s\\<and>%s=name %s" part1 part2 t (get_pf_name_list pfs)
 
 let analyze_lemma rels pfs_prop =
   let pfs =
@@ -436,17 +436,99 @@ from a2 obtain %s where
   a2:\"%s\"
 by blast
 have %s by auto
-%s
-"
+%s"
   rn pn
-  (get_param_name_list pfs_r) (analyze_rels_in_pfs "r" rn pfs_r)
-  (get_param_name_list pfs_prop) (analyze_rels_in_pfs "f" pn pfs_prop)
-  (get_param_name_list pfs_r)
+  (get_pf_name_list pfs_r) (analyze_rels_in_pfs "r" rn pfs_r)
+  (get_pf_name_list pfs_prop) (analyze_rels_in_pfs "f" pn pfs_prop)
+  (get_pf_name_list pfs_r)
   (analyze_rels_in_pfs "r" rn pfs_r)
-  (get_param_name_list pfs_prop)
+  (get_pf_name_list pfs_prop)
   (analyze_rels_in_pfs "f" pn pfs_prop)
   (String.concat ~sep:"\\<or>" conditions)
   (String.concat ~sep:"\n" moreovers)
+
+
+
+
+
+
+
+let get_pd_name_list pds =
+  String.concat ~sep:" " (List.map pds ~f:(fun pd ->
+    let Paramdef(vn, _) = pd in vn
+  ))
+
+let analyze_rels_in_pds t name pds =
+  let part1 = String.concat ~sep:"\\<and>" (List.map pds ~f:(fun pd ->
+    let Paramdef(vn, _) = pd in sprintf "%s\\<le>N" vn
+  )) in
+  let pairs = combination pds 2 in
+  let part2 = String.concat ~sep:"\\<and>" (List.map pairs ~f:(fun [pd1; pd2] ->
+    let Paramdef(vn1, _), Paramdef(vn2, _) = pd1, pd2 in sprintf "%s~=%s" vn1 vn2
+  )) in
+  sprintf "%s\\<and>%s\\<and>%s=name %s" part1 part2 t (get_pd_name_list pds)
+
+let analyze_rules_invs rules invs =
+  let inv_param_constraints =
+    List.map invs ~f:(fun (Paramecium.Prop(name, pds, _)) -> 
+      sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds)
+    )
+    |> String.concat ~sep:" \\<or>\n      "
+  in
+  let analyze_rule_invs (Rule(rname, pds, _, _)) =
+    let analyze_rule_inv (Paramecium.Prop(pname, pds, _)) =
+      sprintf
+"    moreover {
+      assume e1: %s
+      have invHoldForRule f r (invariants N)
+      by (cut_tac a1 a2 b1 c1 d1 e1, metis %sVs%s)
+    }"
+        (sprintf "\\<exists> %s. %s" (get_pd_name_list pds) (analyze_rels_in_pds "f" pname pds))
+        rname pname
+    in
+    sprintf
+"  moreover {
+    assume c1: %s
+    have d1: %s
+    by (cut_tac a1 a2 b1 c1 d1, simp)
+    %s
+    ultimately have invHoldForRule f r (invariants N)
+    by blast
+  }"
+      (analyze_rels_in_pds "r" rname pds)
+      inv_param_constraints
+      (String.concat ~sep:"\n" (List.map invs ~f:(analyze_rule_inv)))
+  in
+  String.concat ~sep:"\n" (List.map rules ~f:(analyze_rule_invs))
+
+let gen_main rules invs =
+  let rule_param_constraints =
+    List.map rules ~f:(fun (Rule(name, pds, _, _)) -> 
+      sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "r" name pds)
+    )
+    |> String.concat ~sep:" \\<or>\n    "
+  in
+  sprintf
+"lemma main: [| s \\<in> reachableSet {allInitSpecs N} (rules N); 0 < N |]
+==> \\<forall> inv. inv \\<in> (invariants N) --> formEval inv s
+proof (rule consistentLemma)
+%s
+next show \\<forall> inv r. inv \\<in> invariants N --> r \\<in> rules N --> \
+invHoldForRule inv r (invariants N)
+proof ((rule allI)+, (rule impI)+)
+  fix f r
+  assume a1: f \\<in> invariants N and a2: r \\<in> rules N
+  have b1: %s
+  by (cut_tac a1 a2 b1, auto)
+  %s
+  ultimately show invHoldForRule f r (invariants N) by blast
+qed
+qed"
+  "......"
+  rule_param_constraints
+  (analyze_rules_invs rules invs)
+
+
 
 
 
@@ -462,6 +544,7 @@ let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varn
   let invs_str = invs_act cinvs in
   let inits_str = inits_act init in
   let lemmas_str = String.concat ~sep:"\n\n" (List.map relations ~f:gen_lemma) in
+  let main_lemma = gen_main rules (List.map cinvs ~f:(fun (ConcreteProp(p, _)) -> p)) in
   sprintf "\
 theory %s imports localesDef
 begin
@@ -471,4 +554,5 @@ section{*Main definitions*}
 %s\n
 %s\n
 %s\n
-end\n" name types_str rules_str invs_str inits_str lemmas_str
+%s\n
+end\n" name types_str rules_str invs_str inits_str lemmas_str main_lemma
