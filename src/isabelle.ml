@@ -528,8 +528,7 @@ let gen_lemma_invs_on_ini invs =
 assumes a1: \"%s\"
 and a2: \"formEval (andList (allInitSpecs N)) s\"
 shows \"formEval f s\"
-using a1 a2 by auto
-qed"
+using a1 a2 by auto"
       name
       (sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds))
   in
