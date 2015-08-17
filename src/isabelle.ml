@@ -521,6 +521,24 @@ qed
 
 
 
+let gen_lemma_invs_on_ini invs =
+  let do_work (Paramecium.Prop(name, pds, _)) =
+    sprintf
+"lemma iniImply_%s:
+assumes a1: \"%s\"
+and a2: \"formEval (andList (allInitSpecs N)) s\"
+shows \"formEval f s\"
+using a1 a2 by auto"
+      name
+      (sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds))
+  in
+  String.concat ~sep:"\n\n" (List.map invs ~f:do_work)
+
+
+
+
+
+
 
 let analyze_rules_invs rules invs =
   let inv_param_constraints =
@@ -533,18 +551,18 @@ let analyze_rules_invs rules invs =
     let analyze_rule_inv (Paramecium.Prop(pname, pds, _)) =
       sprintf
 "    moreover {
-      assume e1: \"%s\"
+      assume f1: \"%s\"
       have \"invHoldForRule f r (invariants N)\"
-      by (cut_tac a1 a2 c1 d1 e1, metis %sVs%s)
+      by (cut_tac b1 b2 d1 e1 f1, metis %sVs%s)
     }"
         (sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" pname pds))
         rname pname
     in
     sprintf
 "  moreover {
-    assume c1: \"%s\"
-    have d1: \"%s\"
-    by (cut_tac a1 a2 c1 d1, simp)
+    assume d1: \"%s\"
+    have e1: \"%s\"
+    by (cut_tac b1 b2 d1 e1, simp)
     %s
     ultimately have \"invHoldForRule f r (invariants N)\"
     by blast
@@ -562,23 +580,58 @@ let gen_main rules invs =
     )
     |> String.concat ~sep:" \\<or>\n    "
   in
+  let inv_param_constraints =
+    List.map invs ~f:(fun (Paramecium.Prop(name, pds, _)) -> 
+      sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds)
+    )
+    |> String.concat ~sep:" \\<or>\n      "
+  in
+  let analyze_inv_on_ini (Paramecium.Prop(name, pds, _)) =
+    sprintf
+"    moreover {
+      assume d1: \"%s\"
+      have \"formEval inv s\"
+      apply (rule iniImply_%s)
+      apply (cut_tac d1, assumption)
+      by (cut_tac b4, simp)
+    }"
+      (sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds))
+      name
+  in
   sprintf
-"lemma main: [| s \\<in> reachableSet {allInitSpecs N} (rules N); 0 < N |]
-==> \\<forall> inv. inv \\<in> (invariants N) --> formEval inv s
+"lemma main:
+assumes a1: \"s \\<in> reachableSet {allInitSpecs N} (rules N)\"
+and a2: \"0 < N\"
+shows \"\\<forall> inv. inv \\<in> (invariants N) formEval inv s\"
 proof (rule consistentLemma)
+show \"newconsistent (invariants N) {andList (allInitSpecs N)} (rules N)\"
+proof (cut_tac a1, unfold newconsistent_def, rule conjI)
+show \"\\<forall> inv ini s. inv \\<in> (invariants N) ini \\<in> {andList (allInitSpecs N)} \
+formEval ini s formEval inv s\"
+proof ((rule allI)+, (rule impI)+)
+  fix inv ini s
+  assume b1: \"inv \\<in> (invariants N)\" and b2: \"ini \\<in> {andList (allInitSpecs N)}\" \
+and b3: \"formEval ini s\"
+  have b4: \"formEval (andList (allInitSpecs N)) s\"
+  by (cut_tac b2 b3, simp)
+  show \"formEval inv s\"
+  proof -
+    have c1: \"%s\"
+    by (cut_tac b1, simp)
 %s
 next show \"\\<forall> inv r. inv \\<in> invariants N --> r \\<in> rules N --> \
 invHoldForRule inv r (invariants N)\"
 proof ((rule allI)+, (rule impI)+)
   fix f r
-  assume a1: \"f \\<in> invariants N and a2: r \\<in> rules N\"
-  have b1: \"%s\"
-  by (cut_tac a2, auto)
+  assume b1: \"f \\<in> invariants N and b2: r \\<in> rules N\"
+  have c1: \"%s\"
+  by (cut_tac b2, auto)
   %s
   ultimately show \"invHoldForRule f r (invariants N)\" by blast
 qed
 qed"
-  "......"
+  inv_param_constraints
+  (String.concat ~sep:"\n" (List.map invs ~f:analyze_inv_on_ini))
   rule_param_constraints
   (analyze_rules_invs rules invs)
 
@@ -600,7 +653,9 @@ let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varn
   let lemmas_str = 
     String.concat ~sep:"\n\n" (List.map relations ~f:(fun rel -> gen_lemma rel rules))
   in
-  let main_lemma = gen_main rules (List.map cinvs ~f:(fun (ConcreteProp(p, _)) -> p)) in
+  let invs = List.map cinvs ~f:(fun (ConcreteProp(p, _)) -> p) in
+  let lemma_invs_on_ini = gen_lemma_invs_on_ini invs in
+  let main_lemma = gen_main rules invs in
   sprintf "\
 theory %s imports localesDef
 begin
@@ -611,4 +666,5 @@ section{*Main definitions*}
 %s\n
 %s\n
 %s\n
-end\n" name types_str rules_str invs_str inits_str lemmas_str main_lemma
+%s\n
+end\n" name types_str rules_str invs_str inits_str lemmas_str lemma_invs_on_ini main_lemma
