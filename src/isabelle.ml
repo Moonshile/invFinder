@@ -419,11 +419,11 @@ let gen_case_2 =
     then have \"invHoldForRule' s f r (invariants N)\" by auto"
 
 let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
-  let form_isabelle = ToIsabelle.form_act f in
+  let f = paramecium_form_to_loach f in
   sprintf
 "    have \"?P3 s\"
-    proof(cut_tac a1 a2 b1 c1, simp, rule_tac x=%s in exI, auto) qed
-    then have \"invHoldForRule' s f r (invariants N)\" by auto" form_isabelle
+    apply (rule_tac x=\"%s\" in exI, auto)
+    then have \"invHoldForRule' s f r (invariants N)\" by auto" (formula_act (neg f))
 
 let gen_branch branch case =
   sprintf "  moreover {\n    assume c1: \"%s\"\n%s\n  }" branch case
@@ -602,25 +602,25 @@ let gen_main rules invs =
 "lemma main:
 assumes a1: \"s \\<in> reachableSet {allInitSpecs N} (rules N)\"
 and a2: \"0 < N\"
-shows \"\\<forall> inv. inv \\<in> (invariants N) --> formEval inv s\"
+shows \"\\<forall> f. f \\<in> (invariants N) --> formEval f s\"
 proof (rule consistentLemma)
 show \"newconsistent (invariants N) {andList (allInitSpecs N)} (rules N)\"
 proof (cut_tac a1, unfold newconsistent_def, rule conjI)
-show \"\\<forall> inv ini s. inv \\<in> (invariants N) --> ini \\<in> {andList (allInitSpecs N)} \
---> formEval ini s --> formEval inv s\"
+show \"\\<forall> f ini s. f \\<in> (invariants N) --> ini \\<in> {andList (allInitSpecs N)} \
+--> formEval ini s --> formEval f s\"
 proof ((rule allI)+, (rule impI)+)
-  fix inv ini s
-  assume b1: \"inv \\<in> (invariants N)\" and b2: \"ini \\<in> {andList (allInitSpecs N)}\" \
+  fix f ini s
+  assume b1: \"f \\<in> (invariants N)\" and b2: \"ini \\<in> {andList (allInitSpecs N)}\" \
 and b3: \"formEval ini s\"
   have b4: \"formEval (andList (allInitSpecs N)) s\"
   by (cut_tac b2 b3, simp)
-  show \"formEval inv s\"
+  show \"formEval f s\"
   proof -
     have c1: \"%s\"
     by (cut_tac b1, simp)
 %s
-next show \"\\<forall> inv r. inv \\<in> invariants N --> r \\<in> rules N --> \
-invHoldForRule inv r (invariants N)\"
+next show \"\\<forall> f r. f \\<in> invariants N --> r \\<in> rules N --> \
+invHoldForRule f r (invariants N)\"
 proof ((rule allI)+, (rule impI)+)
   fix f r
   assume b1: \"f \\<in> invariants N and b2: r \\<in> rules N\"
