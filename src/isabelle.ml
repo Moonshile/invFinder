@@ -23,16 +23,19 @@ let analyze_rels_among_pfs pfs_lists =
     | [_] -> res
     | pfs_list::pfs_lists' ->
       let r = String.concat ~sep:"\\<and>" (List.map pfs_list ~f:(fun (Paramfix(vn, tn, c)) ->
-        String.concat ~sep:"\\<and>" (List.map (List.concat pfs_lists') ~f:(fun pf' ->
-          let Paramfix(vn', tn', c') = pf' in
-          if tn = tn' then
-            match c = c' with
-            | true -> sprintf "%s=%s" vn vn'
-            | false -> sprintf "%s~=%s" vn vn'
-          else begin
-            ""
-          end
-        ))
+        let related =
+          List.filter (List.concat pfs_lists') ~f:(fun (Paramfix(_, tn', _)) -> tn = tn')
+        in
+        let equals = List.filter related ~f:(fun (Paramfix(_, _, c')) -> c = c') in
+        if List.is_empty equals then
+          String.concat ~sep:"\\<and>" (List.map related ~f:(fun (Paramfix(vn', _, _)) ->
+            sprintf "%s~=%s" vn vn'
+          ))
+        else begin
+          String.concat ~sep:"\\<and>" (List.map equals ~f:(fun (Paramfix(vn', _, _)) ->
+            sprintf "%s=%s" vn vn'
+          ))
+        end
       )) in
       wrapper pfs_lists' (res@[r])
   in
@@ -406,21 +409,21 @@ end
 
 
 let gen_case_1 =
-"    have invHoldForRule1 f r (invariants N)
+"    have \"invHoldForRule1 f r (invariants N)\"
     proof(cut_tac a1 a2 b1 c1, auto) qed
-    then have invHoldForRule f r (invariants N) by auto"
+    then have \"invHoldForRule f r (invariants N)\" by auto"
 
 let gen_case_2 =
-"    have invHoldForRule2 f r (invariants N)
+"    have \"invHoldForRule2 f r (invariants N)\"
     proof(cut_tac a1 a2 b1 c1, auto) qed
-    then have invHoldForRule f r (invariants N) by auto"
+    then have \"invHoldForRule f r (invariants N)\" by auto"
 
 let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
   let form_isabelle = ToIsabelle.form_act f in
   sprintf
-"    have invHoldForRule3 f r (invariants N)
+"    have \"invHoldForRule3 f r (invariants N)\"
     proof(cut_tac a1 a2 b1 c1, simp, rule_tac x=%s in exI, auto) qed
-    then have invHoldForRule f r (invariants N) by auto" form_isabelle
+    then have \"invHoldForRule f r (invariants N)\" by auto" form_isabelle
 
 let gen_branch branch case =
   sprintf "  moreover { assume c1: \"%s\"\n  %s\n  }" branch case
@@ -440,7 +443,7 @@ let gen_inst relations condition =
   let branches, moreovers = List.unzip (List.map relations ~f:analyze_branch) in
   sprintf 
 "moreover { assume b1: \"%s\"
-have %s by auto
+have \"%s\" by auto
 %s
 }" condition (String.concat ~sep:"\\<and>" branches) (String.concat ~sep:"\n" moreovers)
 
@@ -480,8 +483,9 @@ by blast
 from a2 obtain %s where
   a2:\"%s\"
 by blast
-have %s by auto
-%s"
+have \"%s\" by auto
+%s
+ultimately have \"invHoldForRule f r (invariants N)\" by auto"
     rn pn
     (get_pf_name_list pfs_r) (analyze_rels_in_pfs "r" rn pfs_r)
     (get_pf_name_list pfs_prop) (analyze_rels_in_pfs "f" pn pfs_prop)
@@ -526,7 +530,7 @@ let analyze_rules_invs rules invs =
       sprintf
 "    moreover {
       assume e1: \"%s\"
-      have invHoldForRule f r (invariants N)
+      have \"invHoldForRule f r (invariants N)\"
       by (cut_tac a1 a2 c1 d1 e1, metis %sVs%s)
     }"
         (sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" pname pds))
@@ -538,7 +542,7 @@ let analyze_rules_invs rules invs =
     have d1: \"%s\"
     by (cut_tac a1 a2 c1 d1, simp)
     %s
-    ultimately have invHoldForRule f r (invariants N)
+    ultimately have \"invHoldForRule f r (invariants N)\"
     by blast
   }"
       (analyze_rels_in_pds "r" rname pds)
@@ -564,7 +568,7 @@ invHoldForRule inv r (invariants N)\"
 proof ((rule allI)+, (rule impI)+)
   fix f r
   assume a1: \"f \\<in> invariants N and a2: r \\<in> rules N\"
-  have b1: %s
+  have b1: \"%s\"
   by (cut_tac a2, auto)
   %s
   ultimately show \"invHoldForRule f r (invariants N)\" by blast
