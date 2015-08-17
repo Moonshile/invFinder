@@ -16,13 +16,6 @@ exception Unsupported of string
 
 let types_ref = ref []
 
-
-
-
-
-
-
-
 let analyze_rels_among_pfs pfs_lists =
   let rec wrapper pfs_lists res =
     match pfs_lists with
@@ -232,6 +225,8 @@ let statement_act statement =
   in
   sprintf "(parallelList [%s])" (String.concat ~sep:", " (List.map balanced ~f:trans))
 
+
+
 let rule_act r =
   let Rule(name, pd, f, s) = r in
   let pd_count_t = List.map pd ~f:(fun _ -> "nat") in
@@ -240,9 +235,14 @@ let rule_act r =
   let pd_names = String.concat ~sep:" " (List.map pd ~f:(fun (Paramdef(n, _)) -> n)) in
   let guard = formula_act f in
   let statements = statement_act s in
-  sprintf "definition %s::\"%s\" where [simp]:
-\"%s %s\\<equiv>\nlet g = %s in\nlet s = %s in\nguard g s\""
-    name rule_type name pd_names guard statements
+  sprintf
+"%s %s\\<equiv>
+let g = %s in
+let s = %s in
+guard g s"
+    name (get_pd_name_list pd)
+    guard
+    statements
 
 let rules_act rs =
   let rstrs = String.concat ~sep:"\n\n" (List.map rs ~f:rule_act) in
@@ -253,6 +253,8 @@ let rules_act rs =
   ) in
   sprintf "%s\n\ndefinition rules::\"nat \\<Rightarrow> rule set\" where [simp]:
 \"rules N \\<equiv> {r.\n%s\n}\"" rstrs r_insts_str
+
+
 
 let rec paramecium_exp_to_loach e =
   match e with
@@ -270,6 +272,8 @@ and paramecium_form_to_loach form =
   | Paramecium.AndList(fl) -> andList (List.map fl ~f:paramecium_form_to_loach)
   | Paramecium.OrList(fl) -> orList (List.map fl ~f:paramecium_form_to_loach)
   | Paramecium.Imply(f1, f2) -> imply (paramecium_form_to_loach f1) (paramecium_form_to_loach f2)
+
+
 
 let inv_act cinv =
   let InvFinder.ConcreteProp(Paramecium.Prop(name, pds, gened_inv), pfs) = cinv in
@@ -291,8 +295,12 @@ let inv_act cinv =
   let pd_str = String.concat ~sep:" \\<Rightarrow> " pd_count_t in
   let inv_type = sprintf "%s \\<Rightarrow> formula" pd_str in
   let pd_names = String.concat ~sep:" " (List.map pds' ~f:(fun (Paramdef(n, _)) -> n)) in
-  name, List.length pds', sprintf "definition %s::\"%s\" where [simp]:
-\"%s %s \\<equiv>\n%s\"" name inv_type name pd_names (formula_act gened_inv'')
+  name, List.length pds',
+  sprintf
+"%s %s\\<equiv>
+%s"
+    name (get_pd_name_list pds)
+    (formula_act gened_inv'')
 
 let invs_act cinvs =
   let invs_with_pd_count = List.map cinvs ~f:inv_act in
