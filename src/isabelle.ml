@@ -422,7 +422,7 @@ let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
   let f = paramecium_form_to_loach f in
   sprintf
 "    have \"?P3 s\"
-    apply (rule_tac x=\"%s\" in exI, auto)
+    apply (cut_tac a1 a2 b1 c1, rule_tac x=\"%s\" in exI, auto)
     then have \"invHoldForRule' s f r (invariants N)\" by auto" (formula_act (neg f))
 
 let gen_branch branch case =
@@ -563,7 +563,7 @@ let analyze_rules_invs rules invs =
     assume d1: \"%s\"
     have e1: \"%s\"
     by (cut_tac b1 b2 d1 e1, simp)
-    %s
+%s
     ultimately have \"invHoldForRule f r (invariants N)\"
     by blast
   }"
