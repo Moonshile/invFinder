@@ -426,7 +426,7 @@ let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
     then have \"invHoldForRule f r (invariants N)\" by auto" form_isabelle
 
 let gen_branch branch case =
-  sprintf "  moreover { assume c1: \"%s\"\n  %s\n  }" branch case
+  sprintf "  moreover {\n    assume c1: \"%s\"\n%s\n  }" branch case
 
 let gen_inst relations condition =
   let analyze_branch {rule=_; inv; branch; relation} =
@@ -442,9 +442,11 @@ let gen_inst relations condition =
   in
   let branches, moreovers = List.unzip (List.map relations ~f:analyze_branch) in
   sprintf 
-"moreover { assume b1: \"%s\"
-have \"%s\" by auto
+"moreover {
+  assume b1: \"%s\"
+  have \"%s\" by auto
 %s
+  ultimately have \"invHoldForRule f r (invariants N)\" by auto
 }" condition (String.concat ~sep:"\\<and>" branches) (String.concat ~sep:"\n" moreovers)
 
 let analyze_lemma rels pfs_prop =
@@ -485,7 +487,8 @@ from a2 obtain %s where
 by blast
 have \"%s\" by auto
 %s
-ultimately have \"invHoldForRule f r (invariants N)\" by auto"
+ultimately show \"invHoldForRule f r (invariants N)\" by auto
+qed"
     rn pn
     (get_pf_name_list pfs_r) (analyze_rels_in_pfs "r" rn pfs_r)
     (get_pf_name_list pfs_prop) (analyze_rels_in_pfs "f" pn pfs_prop)
@@ -506,6 +509,7 @@ a2: \"\\<exists> %s. %s\"
 shows \"invHoldForRule f r (invariants N)\"
 proof -
 by auto
+qed
 "
     rn pn
     (get_pd_name_list pds) (analyze_rels_in_pds "r" rn pds)
