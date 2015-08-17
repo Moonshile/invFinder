@@ -346,7 +346,7 @@ let minify_inv_inc inv =
 
 module InvLib = struct
   
-  let index = ref 0
+  let index = ref 1
 
   let pairs = ref []
 
@@ -748,7 +748,7 @@ let read_res_cache cinvs =
     Storage.get_many (!protocol_name) "relations" [] convertor
   in
   InvLib.pairs := inv_cinv_pairs;
-  InvLib.index := List.length inv_cinv_pairs;
+  InvLib.index := (List.length inv_cinv_pairs + 1);
   (cinvs', relations)
 
 let write_res_cache cinvs new_relations =
@@ -851,7 +851,7 @@ let find ?(smv_escape=(fun inv_str -> inv_str)) ?(smv="") ?(smv_bmc="") ?(murphi
   let cinvs =
     let invs = List.concat (List.map properties ~f:simplify_prop) in
     let indice = up_to (List.length invs) in
-    List.map2_exn invs indice ~f:(fun f id -> form_2_concreate_prop ~id f)
+    List.map2_exn invs indice ~f:(fun f id -> form_2_concreate_prop ~id:(id + 1) f)
   in
   let get_rulename_param_pair r =
     let Paramecium.Rule(rname, paramdefs, _, _) = r in
