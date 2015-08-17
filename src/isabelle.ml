@@ -472,7 +472,7 @@ let gen_lemma relations rules =
 "lemma %sVs%s:
 assumes a1: \"\\<exists> %s. %s\" and
 a2: \"\\<exists> %s. %s\"
-shows invHoldForRule f r (invariants N)
+shows \"invHoldForRule f r (invariants N)\"
 proof -
 from a1 obtain %s where
   a1:\"%s\"
@@ -499,7 +499,7 @@ have %s by auto
 "lemma %sVs%s:
 assumes a1: \"\\<exists> %s. %s\" and
 a2: \"\\<exists> %s. %s\"
-shows invHoldForRule f r (invariants N)
+shows \"invHoldForRule f r (invariants N)\"
 proof -
 by auto
 "
@@ -559,15 +559,15 @@ let gen_main rules invs =
 ==> \\<forall> inv. inv \\<in> (invariants N) --> formEval inv s
 proof (rule consistentLemma)
 %s
-next show \\<forall> inv r. inv \\<in> invariants N --> r \\<in> rules N --> \
-invHoldForRule inv r (invariants N)
+next show \"\\<forall> inv r. inv \\<in> invariants N --> r \\<in> rules N --> \
+invHoldForRule inv r (invariants N)\"
 proof ((rule allI)+, (rule impI)+)
   fix f r
   assume a1: \"f \\<in> invariants N and a2: r \\<in> rules N\"
   have b1: %s
   by (cut_tac a2, auto)
   %s
-  ultimately show invHoldForRule f r (invariants N) by blast
+  ultimately show \"invHoldForRule f r (invariants N)\" by blast
 qed
 qed"
   "......"
