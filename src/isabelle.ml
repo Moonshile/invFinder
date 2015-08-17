@@ -241,7 +241,7 @@ let rules_act rs =
   let rstrs = String.concat ~sep:"\n\n" (List.map rs ~f:rule_act) in
   let r_insts_str = String.concat ~sep:" \\<or>\n" (
     List.map rs ~f:(fun (Rule(name, pds, _, _)) ->
-      sprintf "\\<exists> %s. %s" (get_pd_name_list pds) (analyze_rels_in_pds "r" name pds)
+      sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "r" name pds)
     )
   ) in
   sprintf "%s\n\ndefinition rules::\"nat \\<Rightarrow> rule set\" where [simp]:
@@ -292,7 +292,7 @@ let invs_act cinvs =
   let inv_strs = String.concat ~sep:"\n\n" (List.map invs_with_pd_count ~f:(fun (_, _, s) -> s)) in
   let inv_insts_str = String.concat ~sep:" \\<or>\n" (
     List.map cinvs ~f:(fun (ConcreteProp(Prop(name, pds, _), _)) ->
-      sprintf "\\<exists> %s. %s" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds)
+      sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds)
     )
   ) in
   sprintf "%s\n\ndefinition invariants::\"nat \\<Rightarrow> formula set\" where [simp]:
@@ -423,7 +423,7 @@ let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
     then have invHoldForRule f r (invariants N) by auto" form_isabelle
 
 let gen_branch branch case =
-  sprintf "  moreover { assume c1: %s\n  %s\n  }" branch case
+  sprintf "  moreover { assume c1: \"%s\"\n  %s\n  }" branch case
 
 let gen_inst relations condition =
   let analyze_branch {rule=_; inv; branch; relation} =
@@ -439,7 +439,7 @@ let gen_inst relations condition =
   in
   let branches, moreovers = List.unzip (List.map relations ~f:analyze_branch) in
   sprintf 
-"moreover { assume b1: %s
+"moreover { assume b1: \"%s\"
 have %s by auto
 %s
 }" condition (String.concat ~sep:"\\<and>" branches) (String.concat ~sep:"\n" moreovers)
@@ -470,8 +470,8 @@ let gen_lemma relations rules =
     let conditions, moreovers = List.unzip res in
     sprintf
 "lemma %sVs%s:
-assumes a1: \\<exists> %s. %s and
-a2: \\<exists> %s. %s
+assumes a1: \"\\<exists> %s. %s\" and
+a2: \"\\<exists> %s. %s\"
 shows invHoldForRule f r (invariants N)
 proof -
 from a1 obtain %s where
@@ -497,8 +497,8 @@ have %s by auto
     let Rule(_, pds, _, _) = the_rule in
     sprintf
 "lemma %sVs%s:
-assumes a1: \\<exists> %s. %s and
-a2: \\<exists> %s. %s
+assumes a1: \"\\<exists> %s. %s\" and
+a2: \"\\<exists> %s. %s\"
 shows invHoldForRule f r (invariants N)
 proof -
 by auto
@@ -525,18 +525,18 @@ let analyze_rules_invs rules invs =
     let analyze_rule_inv (Paramecium.Prop(pname, pds, _)) =
       sprintf
 "    moreover {
-      assume e1: %s
+      assume e1: \"%s\"
       have invHoldForRule f r (invariants N)
-      by (cut_tac a1 a2 b1 c1 d1 e1, metis %sVs%s)
+      by (cut_tac a1 a2 c1 d1 e1, metis %sVs%s)
     }"
-        (sprintf "\\<exists> %s. %s" (get_pd_name_list pds) (analyze_rels_in_pds "f" pname pds))
+        (sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" pname pds))
         rname pname
     in
     sprintf
 "  moreover {
-    assume c1: %s
-    have d1: %s
-    by (cut_tac a1 a2 b1 c1 d1, simp)
+    assume c1: \"%s\"
+    have d1: \"%s\"
+    by (cut_tac a1 a2 c1 d1, simp)
     %s
     ultimately have invHoldForRule f r (invariants N)
     by blast
@@ -563,9 +563,9 @@ next show \\<forall> inv r. inv \\<in> invariants N --> r \\<in> rules N --> \
 invHoldForRule inv r (invariants N)
 proof ((rule allI)+, (rule impI)+)
   fix f r
-  assume a1: f \\<in> invariants N and a2: r \\<in> rules N
+  assume a1: \"f \\<in> invariants N and a2: r \\<in> rules N\"
   have b1: %s
-  by (cut_tac a1 a2 b1, auto)
+  by (cut_tac a2, auto)
   %s
   ultimately show invHoldForRule f r (invariants N) by blast
 qed
