@@ -751,6 +751,7 @@ let fix_relations_with_cinvs cinvs relations =
             | Some(_, cinv) ->
               {rule; inv; branch = branch'; relation = invHoldForRule3 (rename_with_cinv cinv)}
             | None ->
+              Prt.warning ("Implied by old: "^ToStr.Smv.form_act rel_inv);
               {rule; inv; branch = branch'; relation = invHoldForRule3 (rename_with_cinv rel_cinv)}
           end
         | _ -> relation
