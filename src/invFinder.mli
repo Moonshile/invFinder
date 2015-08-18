@@ -70,7 +70,7 @@ with sexp
 
 val get_rname_of_crname : string -> string
 val concrete_prop_2_form : concrete_prop -> Paramecium.formula
-val form_2_concreate_prop : ?id:int -> Paramecium.formula -> concrete_prop
+val form_2_concreate_prop : ?id:int -> ?rename:bool -> Paramecium.formula -> concrete_prop
 
 (** Convert t to a string *)
 val to_str : t -> string

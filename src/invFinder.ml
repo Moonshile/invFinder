@@ -138,12 +138,11 @@ let concrete_prop_2_form cprop =
   apply_form form ~p:pfs
 
 (* Convert formula to concrete property *)
-let form_2_concreate_prop ?(id=0) form =
+let form_2_concreate_prop ?(id=0) ?(rename=true) form =
   let new_inv_name_base = "inv__" in
   (* Generate names for new invariants found *)
   let next_inv_name id = sprintf "%s%d" new_inv_name_base id in
-  let normalized = normalize form ~types:!type_defs in
-  let (pds, pfs, form') = Generalize.form_act normalized in
+  let (pds, pfs, form') = Generalize.form_act ~rename form in
   let property = prop (next_inv_name id) pds form' in
   concrete_prop property pfs
 
@@ -154,7 +153,8 @@ let relation_2_str relation =
   | InvHoldForRule2 -> "invHoldForRule2"
   | InvHoldForRule3(cp) -> 
     let form = (concrete_prop_2_form cp) in
-    sprintf "invHoldForRule3-%s" (ToStr.Smv.form_act form)
+    let ConcreteProp(Prop(pname, _, _), _) = cp in
+    sprintf "invHoldForRule3-%s:%s" pname (ToStr.Smv.form_act form)
 
 (** Convert t to a string *)
 let to_str {rule; inv; branch; relation} =
@@ -302,14 +302,6 @@ let minify_inv_inc inv =
       raise Empty_exception
     | parts::components' ->
       let piece = normalize (andList parts) ~types:(!type_defs) in
-      (*let (_, pfs, _) = Generalize.form_act piece in
-      Prt.info ("parts: "^ToStr.Smv.form_act (andList parts)^
-        "\nnormalized: "^ToStr.Smv.form_act piece^"Res: "^
-        (if List.length pfs <= 3 then
-          (if Smv.is_inv (ToStr.Smv.form_act (neg piece)) then "true" else "false")
-          else begin "unknown" end
-        )
-      );*)
       let check_inv_res =
         let (_, pfs, _) = Generalize.form_act piece in
         (* TODO *)
@@ -331,7 +323,7 @@ let minify_inv_inc inv =
           check_with_murphi piece
         end
       in
-      if check_inv_res then piece
+      if check_inv_res then andList parts
       else begin wrapper components' end
   in
   let ls = match inv with | AndList(fl) -> fl | _ -> [inv] in
@@ -351,6 +343,7 @@ module InvLib = struct
   let pairs = ref []
 
   let add inv =
+    let inv = normalize inv ~types:(!type_defs) in
     match List.find (!pairs) ~f:(fun (p, _) -> symmetry_form p inv = 0) with
     | Some(_, cinv) -> cinv
     | None ->
@@ -369,7 +362,12 @@ module InvLib = struct
       | [] -> None
       | (old, c_old)::invs' ->
         let res = can_imply inv old in
-        if res = None then wrapper invs' else begin Some c_old end
+        match res with
+        | None -> wrapper invs'
+        | Some(f) ->
+          let ConcreteProp(Prop(pname, _, _), _) = c_old in
+          let ConcreteProp(Prop(_, ppds, pform), ppfs) = form_2_concreate_prop f in
+          Some (concrete_prop (prop pname ppds pform) ppfs)
     in
     wrapper (!pairs)
 
@@ -734,13 +732,26 @@ let fix_relations_with_cinvs cinvs relations =
       let fixed = 
         match relation with
         | {rule; inv; branch; relation=InvHoldForRule3(rel_cinv)} ->
+          let ConcreteRule(_, pfs_rule) = rule in
+          let ConcreteProp(_, pfs_prop) = inv in
           begin
             let rel_inv = concrete_prop_2_form rel_cinv in
-            match List.find pairs ~f:(fun (inv, _) ->
-              symmetry_form inv rel_inv = 0
-            ) with
-            | Some(_, cinv) -> {rule; inv; branch; relation = invHoldForRule3 cinv}
-            | None -> Prt.warning ("implied by old:"^(ToStr.Smv.form_act rel_inv)); relation
+            let branch' = RenameParam.form_act ~pfs_rule ~pfs_prop branch in
+            let rename_with_cinv (ConcreteProp(Prop(pname, _, _), _)) =
+              (* Rename parameters of the actual generated invariant to be
+                 consistent with the concrete rule and inv
+              *)
+              let renamed = RenameParam.form_act ~pfs_rule ~pfs_prop rel_inv in
+              let ConcreteProp(Prop(_, ppds, pform), ppfs) =
+                form_2_concreate_prop ~rename:false renamed
+              in
+              concrete_prop (prop pname ppds pform) ppfs
+            in
+            match List.find pairs ~f:(fun (inv, _) -> symmetry_form inv rel_inv = 0) with
+            | Some(_, cinv) ->
+              {rule; inv; branch = branch'; relation = invHoldForRule3 (rename_with_cinv cinv)}
+            | None ->
+              {rule; inv; branch = branch'; relation = invHoldForRule3 (rename_with_cinv rel_cinv)}
           end
         | _ -> relation
       in
@@ -898,7 +909,10 @@ let find ?(smv_escape=(fun inv_str -> inv_str)) ?(smv="") ?(smv_bmc="") ?(murphi
   protocol_name := name;
   cache_vars_of_rules rules;
   let cinvs =
-    let invs = List.concat (List.map properties ~f:simplify_prop) in
+    let invs =
+      List.concat (List.map properties ~f:simplify_prop)
+      |> List.map ~f:(normalize ~types:(!type_defs))
+    in
     let indice = up_to (List.length invs) in
     List.map2_exn invs indice ~f:(fun f id -> form_2_concreate_prop ~id:(id + 1) f)
   in
