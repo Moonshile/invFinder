@@ -73,7 +73,7 @@ let invHoldForRule3 p = InvHoldForRule3 p
 type t = {
   rule: concrete_rule;
   inv: concrete_prop;
-  branch: formula;
+  branch: concrete_prop;
   relation: relation;
 }
 with sexp
@@ -164,7 +164,7 @@ let to_str {rule; inv; branch; relation} =
     | AllRuleInst(rname) -> rname
   in
   let inv_str = ToStr.Smv.form_act (concrete_prop_2_form inv) in
-  let branch_str = ToStr.Smv.form_act branch in
+  let branch_str = ToStr.Smv.form_act (concrete_prop_2_form branch) in
   let rel_str = relation_2_str relation in
   sprintf "rule: %s; inv: %s; g: %s; rel: %s" rname inv_str branch_str rel_str
 
@@ -655,7 +655,7 @@ let deal_with_case_2 crule cinv g =
 (* Deal with case invHoldForRule3 *)
 let deal_with_case_3 crule cinv cons g =
   let Rule(name, _, guard, statement), _, guards, assigns = concrete_rule_2_rule_inst crule in
-  let level = Choose.choose (g::guards) assigns cons in
+  let level = Choose.choose (concrete_prop_2_form g::guards) assigns cons in
   let (new_inv, causal_cinv) =
     match level with
     | Choose.Tautology(_) -> ([], form_2_concreate_prop chaos)
@@ -687,6 +687,8 @@ let deal_with_case_3 crule cinv cons g =
 
 (* Find new inv and relations with concrete rule and a concrete invariant *)
 let tabular_expans (Rule(_name, _, form, _), crule, _, assigns) ~cinv =
+  let ConcreteRule(_, pfs_rule) = crule in
+  let ConcreteProp(_, pfs_prop) = cinv in
   let inv_inst = simplify (concrete_prop_2_form cinv) in
   (* pre_cond *)
   let obligations =
@@ -697,16 +699,20 @@ let tabular_expans (Rule(_name, _, form, _), crule, _, assigns) ~cinv =
     match obligations with
     | [] -> relations
     | (g, obligation)::obligations' ->
+      let branch =
+        RenameParam.form_act ~pfs_rule ~pfs_prop g
+        |> form_2_concreate_prop ~rename:false
+      in
       let relation = 
         (* case 2 *)
         if obligation = inv_inst || symmetry_form obligation inv_inst = 0 then
-          ([], deal_with_case_2 crule cinv g)
+          ([], deal_with_case_2 crule cinv branch)
         (* case 1 *)
         else if is_tautology (imply form (neg obligation)) then
-          ([], deal_with_case_1 crule cinv g)
+          ([], deal_with_case_1 crule cinv branch)
         (* case 3 *)
         else begin
-          deal_with_case_3 crule cinv obligation g
+          deal_with_case_3 crule cinv obligation branch
         end
       in
       deal_with_case obligations' (relation::relations)
@@ -741,9 +747,6 @@ let fix_relations_with_cinvs cinvs relations =
           let ConcreteProp(_, pfs_prop) = inv in
           begin
             let rel_inv = concrete_prop_2_form rel_cinv in
-            let branch' =
-              RenameParam.form_act ~pfs_rule ~pfs_prop branch
-            in
             let rename_with_cinv (ConcreteProp(Prop(pname, _, _), _)) =
               (* Rename parameters of the actual generated invariant to be
                  consistent with the concrete rule and inv
@@ -756,10 +759,10 @@ let fix_relations_with_cinvs cinvs relations =
             in
             match List.find pairs ~f:(fun (inv, _) -> symmetry_form inv rel_inv = 0) with
             | Some(_, cinv) ->
-              {rule; inv; branch = branch'; relation = invHoldForRule3 (rename_with_cinv cinv)}
+              {rule; inv; branch; relation = invHoldForRule3 (rename_with_cinv cinv)}
             | None ->
               Prt.warning ("Implied by old: "^ToStr.Smv.form_act rel_inv);
-              {rule; inv; branch = branch'; relation = invHoldForRule3 (rename_with_cinv rel_cinv)}
+              {rule; inv; branch; relation = invHoldForRule3 (rename_with_cinv rel_cinv)}
           end
         | _ -> relation
       in
@@ -774,7 +777,7 @@ let get_res_of_cinv cinv rname_paraminfo_pairs =
     String.Set.is_empty (String.Set.inter vars_of_cinv (Hashtbl.find_exn rule_vars_table rn))
   ) in
   let relations_of_hold2 = List.map rule_names ~f:(fun rn -> 
-    [[deal_with_case_2 (all_rule_inst_from_name rn) cinv chaos]]
+    [[deal_with_case_2 (all_rule_inst_from_name rn) cinv (form_2_concreate_prop chaos)]]
   ) in
   let rule_inst_names = 
     compute_rule_inst_names rname_paraminfo_pairs prop_pds

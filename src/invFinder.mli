@@ -63,7 +63,7 @@ val invHoldForRule3 : concrete_prop -> relation
 type t = {
   rule: concrete_rule;
   inv: concrete_prop;
-  branch: formula;
+  branch: concrete_prop;
   relation: relation;
 }
 with sexp

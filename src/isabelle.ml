@@ -416,9 +416,25 @@ let gen_branch branch case =
   sprintf "  moreover {\n    assume c1: \"%s\"\n%s\n  }" branch case
 
 let gen_inst relations condition =
-  let analyze_branch {rule=_; inv; branch; relation} =
-    let ConcreteProp(Prop(_, _, g), _) = form_2_concreate_prop branch in
-    let branch_str = ToIsabelle.form_act g in
+  let analyze_branch {rule; inv; branch; relation} =
+    let ConcreteProp(Prop(_, _, g), pfs) = branch in
+    let ConcreteRule(_, pfs_rule) = rule in
+    let ConcreteProp(_, pfs_prop) = inv in
+    let pfs_current = pfs_rule@pfs_prop in
+    let branch_constraint =
+      let overflow = List.filter pfs ~f:(fun (Paramfix(_, tn, c)) ->
+        not (List.exists pfs_current ~f:(fun (Paramfix(_, tn', c')) -> tn = tn' && c = c'))
+      ) in
+      let param_rels = String.concat ~sep:"\\<and>" (List.map overflow ~f:(fun (Paramfix(vn, _, _)) ->
+        String.concat ~sep:"\\<and>" (List.map pfs_current ~f:(fun (Paramfix(vn', _, _)) ->
+          sprintf "%s~=%s" vn vn'
+        ))
+      )) in
+      match overflow with
+      | [] -> ""
+      | _ -> sprintf "\\<exists> %s. %s\\<and>" (get_pf_name_list overflow) param_rels
+    in
+    let branch_str = sprintf "(%s%s)" branch_constraint (formula_act (paramecium_form_to_loach g)) in
     let case_str =
       match relation with
       | InvHoldForRule1 -> gen_case_1
