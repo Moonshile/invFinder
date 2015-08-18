@@ -400,6 +400,7 @@ let protocol = {
 }
 
 let () = run_with_cmdline (fun () ->
+  let protocol = preprocess_rule_guard ~loach:protocol in
   let cinvs_with_varnames, relations = find ~murphi:(In_channel.read_all "n_flash_nodata.m") protocol in
   let filename = sprintf "%s.thy" protocol.name in
   Out_channel.write_all filename (Isabelle.protocol_act protocol cinvs_with_varnames relations)

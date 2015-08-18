@@ -112,7 +112,9 @@ val analyze_if : statement -> formula -> types:Paramecium.typedef list ->
 
 
 val balance_ifstatement : statement -> statement list
+val eliminate_ifelse : statement -> statement
 
+val preprocess_rule_guard : loach:protocol -> protocol
 
 (*----------------------------- Translate module ---------------------------------*)
 

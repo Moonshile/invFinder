@@ -285,7 +285,19 @@ let rec balance_ifstatement statement =
     let bs = balance_ifstatement s in
     List.map bs ~f:(fun s' -> forStatement s' pd)
 
-
+let eliminate_ifelse statement =
+  let rec wrapper statement =
+    match statement with
+    | Assign(_) -> statement
+    | IfelseStatement(f, s1, s2) ->
+      let Assign(v, e1) = wrapper s1 in
+      let Assign(_, e2) = wrapper s2 in
+      assign v (ite f e1 e2)
+    | ForStatement(s, pd) -> forStatement (wrapper s) pd
+    | _ -> raise Empty_exception
+  in
+  let balanced = balance_ifstatement statement in
+  parallel (List.map balanced ~f:wrapper)
 
 
 
@@ -381,6 +393,27 @@ let simplify form =
   wrapper no_imply_neg
 
 
+
+
+
+
+
+let preprocess_rule_guard  ~loach:{name; types; vardefs; init; rules; properties} =
+  let do_work (Rule(name, pds, f, s)) =
+    let simplified = simplify f in
+    match simplified with
+    | OrList(fl) ->
+      let indice = up_to (List.length fl) in
+      List.map2_exn fl indice ~f:(fun g i -> rule (sprintf "%s__part__%d" name i) pds g s)
+    | _ -> [rule name pds simplified s]
+  in {
+    name;
+    types;
+    vardefs;
+    init;
+    rules = List.concat (List.map rules ~f:do_work);
+    properties
+  }
 
 
 

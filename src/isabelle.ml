@@ -197,36 +197,23 @@ and formula_act f =
     end
 
 let statement_act statement =
-  let balanced = balance_ifstatement statement in
-  let trans bs =
+  let Parallel(ite_formed) = eliminate_ifelse statement in
+  let rec trans bs =
     match bs with
     | Assign(v, e) -> sprintf "(assign (%s, %s))" (var_act v) (exp_act e)
-    | IfelseStatement(f, Assign(v, e1), Assign(_, e2)) ->
-      sprintf "(assign (%s, (iteForm %s %s %s)))" (var_act v) (formula_act f) (exp_act e1) (exp_act e2)
-    | ForStatement(Assign(v, e), pd) ->
+    | ForStatement(s, pd) ->
       begin
         match pd with
         | [] -> raise Empty_exception
         | [Paramdef(name, tname)] ->
           let type_range = name2type ~tname ~types:(!types_ref) in
-          let s_str = sprintf "(assign (%s, %s))" (var_act v) (exp_act e) in
+          let s_str = trans s in
           sprintf "(forallSent (down N) (\\<lambda>%s. %s))" name s_str
-        | _ -> raise (Unsupported "More than 1 paramters in exists are not supported yet")
-      end
-    | ForStatement(IfelseStatement(f, Assign(v, e1), Assign(_, e2)), pd) ->
-      begin
-        match pd with
-        | [] -> raise Empty_exception
-        | [Paramdef(name, tname)] ->
-          let type_range = name2type ~tname ~types:(!types_ref) in
-          let s_str = sprintf "(assign (%s, (iteForm %s %s %s)))"
-            (var_act v) (formula_act f) (exp_act e1) (exp_act e2) in
-          sprintf "(forallSent (down N) (\\<lambda>%s. %s))" name s_str
-        | _ -> raise (Unsupported "More than 1 paramters in exists are not supported yet")
+        | _ -> raise (Unsupported "More than 1 paramters in for statement are not supported yet")
       end
     | _ -> raise Empty_exception
   in
-  sprintf "(parallelList [%s])" (String.concat ~sep:", " (List.map balanced ~f:trans))
+  sprintf "(parallelList [%s])" (String.concat ~sep:", " (List.map ite_formed ~f:trans))
 
 let rule_act r =
   let Rule(name, pd, f, s) = r in
@@ -500,20 +487,22 @@ qed"
     (String.concat ~sep:"\n" moreovers)
   | AllRuleInst(rn) ->
     let rn = get_rname_of_crname rn in
-    let the_rule = List.find_exn rules ~f:(fun (Rule(n, _, _, _)) -> rn = n) in
-    let Rule(_, pds, _, _) = the_rule in
-    sprintf
-"lemma %sVs%s:
-assumes a1: \"\\<exists> %s. %s\" and
-a2: \"\\<exists> %s. %s\"
-shows \"invHoldForRule f r (invariants N)\"
-proof -
-by auto
-qed
-"
-    rn pn
-    (get_pd_name_list pds) (analyze_rels_in_pds "r" rn pds)
-    (get_pf_name_list pfs_prop) (analyze_rels_in_pfs "f" pn pfs_prop)
+    match List.find rules ~f:(fun (Rule(n, _, _, _)) -> rn = n) with
+    | None -> Prt.error (sprintf "can't find rule %s" rn); raise Empty_exception
+    | Some(the_rule) ->
+      let Rule(_, pds, _, _) = the_rule in
+      sprintf
+  "lemma %sVs%s:
+  assumes a1: \"\\<exists> %s. %s\" and
+  a2: \"\\<exists> %s. %s\"
+  shows \"invHoldForRule f r (invariants N)\"
+  proof -
+  by auto
+  qed
+  "
+      rn pn
+      (get_pd_name_list pds) (analyze_rels_in_pds "r" rn pds)
+      (get_pf_name_list pfs_prop) (analyze_rels_in_pfs "f" pn pfs_prop)
 
 
 

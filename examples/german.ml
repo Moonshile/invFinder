@@ -166,8 +166,10 @@ let protocol = {
   properties;
 }
 
-let () = run_with_cmdline (fun () -> 
+let () = run_with_cmdline (fun () ->
+  let protocol = preprocess_rule_guard ~loach:protocol in
   let cinvs_with_varnames, relations = find protocol in
-  ()
+  let filename = sprintf "%s.thy" protocol.name in
+  Out_channel.write_all filename (Isabelle.protocol_act protocol cinvs_with_varnames relations)
 )
 
