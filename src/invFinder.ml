@@ -581,6 +581,55 @@ end
 
 
 
+(** Rename the parameters in a concrete component with given paramfixes
+    of concrete rules and concrete properties *)
+module RenameParam = struct
+  
+  let pfs_rule_ref = ref []
+  let pfs_prop_ref = ref []
+
+  let paramref_act pr =
+    match pr with
+    | Paramref(_) -> raise Empty_exception
+    | Paramfix(_, tn, c) ->
+      let pfs_are_match (Paramfix(_, tn', c')) = tn = tn' && c = c' in
+      begin
+        match List.find (!pfs_prop_ref) ~f:pfs_are_match with
+        | Some(pf) -> pf
+        | None -> List.find_exn (!pfs_rule_ref) ~f:pfs_are_match
+      end
+
+  let var_act (Arr(ls)) =
+    arr (List.map ls ~f:(fun (name, prs) ->
+      name, List.map prs ~f:paramref_act
+    ))
+
+  let rec exp_act e =
+    match e with
+    | Const(_) -> e
+    | Var(v) -> var (var_act v)
+    | Param(pr) -> param (paramref_act pr)
+    | Ite(f, e1, e2) -> ite (form_act f) (exp_act e1) (exp_act e2)
+  and form_act ?(pfs_rule=(!pfs_rule_ref)) ?(pfs_prop=(!pfs_prop_ref)) f =
+    pfs_rule_ref := pfs_rule;
+    pfs_prop_ref := pfs_prop;
+    match f with
+    | Chaos
+    | Miracle -> f
+    | Eqn(e1, e2) -> eqn (exp_act e1) (exp_act e2)
+    | Neg(g) -> neg (form_act g)
+    | AndList(fl) -> andList (List.map fl ~f:form_act)
+    | OrList(fl) -> orList (List.map fl ~f:form_act)
+    | Imply(f1, f2) -> imply (form_act f1) (form_act f2)
+
+end
+
+
+
+
+
+
+
   
 
 

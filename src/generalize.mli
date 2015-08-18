@@ -9,4 +9,4 @@ open Paramecium
 open Core.Std
 
 (** Convert formula *)
-val form_act : formula -> paramdef list * paramref list * formula
+val form_act : ?rename:bool -> formula -> paramdef list * paramref list * formula

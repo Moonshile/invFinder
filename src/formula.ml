@@ -290,18 +290,19 @@ let param_compatible
   end
 
 (* Decide if formula cons could be implied by ant *)
-let can_imply ant cons =
+let can_imply cons ant =
+  let cons' = simplify cons in
   let ant_vars = VarNames.of_form ant in
-  let cons_vars = VarNames.of_form cons in
+  let cons_vars = VarNames.of_form cons' in
   let (ant_pd, ant_p, ant_gened) = Generalize.form_act ant in
-  let (_, cons_p, _) = Generalize.form_act cons in
+  let (_, cons_p, _) = Generalize.form_act cons' in
   (* If vars in old are more than vars in inv, then can't imply *)
   (* TODO is there some problems in this strategy? *)
   if String.Set.length (String.Set.diff ant_vars cons_vars) > 0 then
     None
   (* If length of parameters in old is 0, then check directly *)
   else if List.length ant_pd = 0 then
-    if is_tautology (imply (simplify ant) (simplify cons)) then Some ant
+    if is_tautology (imply (simplify ant) cons') then Some ant
     else begin None end
   (* If old has more paramters, then false *)
   else if param_compatible cons_p ant_p = [] then None
@@ -314,7 +315,7 @@ let can_imply ant cons =
       | [] -> None
       | p::params' ->
         let new_ant = apply_form ant_gened ~p in
-        if is_tautology (imply (simplify new_ant) (simplify cons)) then
+        if is_tautology (imply (simplify new_ant) cons') then
           Some new_ant
         else begin
           has_implied params'

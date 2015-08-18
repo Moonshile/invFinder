@@ -13,6 +13,8 @@ let table = Hashtbl.create ~hashable:String.hashable ()
 
 let base_index = ref 0
 
+let rename_ref = ref true
+
 let next_name () = 
   let res = sprintf "p__Inv%d" (!base_index) in
   incr base_index; res
@@ -21,20 +23,27 @@ let next_name () =
 let paramref_act pr pds pfs =
   match pr with
   | Paramref(_) -> Prt.error (ToStr.Debug.paramref_act pr^"\n"); raise Unexhausted_inst
-  | Paramfix(_, tname, c) -> (
-    let key = tname^ToStr.Debug.const_act c in
-    match Hashtbl.find table key with
-    | None ->
-      let new_name = next_name () in
-      let new_pd = paramdef new_name tname in
-      Hashtbl.replace table ~key ~data:new_pd;
-      (new_pd::pds, paramfix new_name tname c::pfs, paramref new_name)
-    | Some(Paramdef(vn, _)) ->
-      let has = List.exists pds ~f:(fun (Paramdef(n, _)) -> n = vn) in
-      let pds' = if has then pds else paramdef vn tname::pds in
-      let pfs' = if has then pfs else paramfix vn tname c::pfs in
-      (pds', pfs', paramref vn)
-  )
+  | Paramfix(vname, tname, c) ->
+    if (!rename_ref) then
+      begin
+        let key = tname^ToStr.Debug.const_act c in
+        match Hashtbl.find table key with
+        | None ->
+          let new_name = next_name () in
+          let new_pd = paramdef new_name tname in
+          Hashtbl.replace table ~key ~data:new_pd;
+          (new_pd::pds, paramfix new_name tname c::pfs, paramref new_name)
+        | Some(Paramdef(vn, _)) ->
+          let has = List.exists pds ~f:(fun (Paramdef(n, _)) -> n = vn) in
+          let pds' = if has then pds else paramdef vn tname::pds in
+          let pfs' = if has then pfs else paramfix vn tname c::pfs in
+          (pds', pfs', paramref vn)
+      end
+    else begin
+      match List.find pds ~f:(fun (Paramdef(vn, _)) -> vn = vname) with
+      | None -> (paramdef vname tname::pds, pr::pfs, paramref vname)
+      | Some(_) -> (pds, pfs, paramref vname)
+    end
 
 (** Convert a list of components *)
 let components_act components pds pfs ~f =
@@ -72,7 +81,8 @@ let exp_act e pds pfs =
   | Ite(_, _, _) -> raise Empty_exception
 
 (** Convert formula *)
-let form_act f =
+let form_act ?(rename=true) f =
+  rename_ref := rename;
   let rec wrapper f pds pfs =
     match f with
     | Chaos
@@ -120,4 +130,9 @@ let form_act f =
   (*Prt.info (ToStr.Debug.form_act f^"\n"^ToStr.Debug.form_act f'^", "^
     (String.concat (List.map sorted_pfs ~f:ToStr.Debug.paramref_act))^"\n")*)
   (sorted_pds, sorted_pfs, f')
+
+
+
+
+
 
