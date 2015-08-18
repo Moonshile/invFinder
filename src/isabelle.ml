@@ -409,7 +409,7 @@ let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
   let f = paramecium_form_to_loach f in
   sprintf
 "    have \"?P3 s\"
-    apply (cut_tac a1 a2 b1 c1, simp, rule_tac x=\"%s\" in exI, auto)
+    by (cut_tac a1 a2 b1 c1, simp, rule_tac x=\"%s\" in exI, auto)
     then have \"invHoldForRule' s f r (invariants N)\" by auto" (formula_act (neg f))
 
 let gen_branch branch case =
@@ -541,22 +541,22 @@ let analyze_rules_invs rules invs =
       sprintf
 "    moreover {
       assume f1: \"%s\"
-      have \"invHoldForRule f r (invariants N)\"
-      by (cut_tac b1 b2 d1 e1 f1, metis %sVs%s)
+      have \"invHoldForRule' s f r (invariants N)\"
+      by (cut_tac b1 b2 d1 f1, metis %sVs%s)
     }"
         (sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" pname pds))
         rname pname
     in
     sprintf
 "  moreover {
-    assume d1: \"%s\"
+    assume d1: \"\\<exists> %s. %s\"
     have e1: \"%s\"
-    by (cut_tac b1 b2 d1 e1, simp)
+    by (cut_tac b1, auto)
 %s
-    ultimately have \"invHoldForRule f r (invariants N)\"
+    ultimately have \"invHoldForRule' s f r (invariants N)\"
     by blast
   }"
-      (analyze_rels_in_pds "r" rname pds)
+      (get_pd_name_list pds) (analyze_rels_in_pds "r" rname pds)
       inv_param_constraints
       (String.concat ~sep:"\n" (List.map invs ~f:(analyze_rule_inv)))
   in
@@ -579,7 +579,7 @@ let gen_main rules invs =
     sprintf
 "    moreover {
       assume d1: \"%s\"
-      have \"formEval inv s\"
+      have \"formEval f s\"
       apply (rule iniImply_%s)
       apply (cut_tac d1, assumption)
       by (cut_tac b4, simp)
@@ -589,10 +589,10 @@ let gen_main rules invs =
   in
   sprintf
 "lemma main:
-assumes a1: \"s \\<in> reachableSet {allInitSpecs N} (rules N)\"
+assumes a1: \"s \\<in> reachableSet {andList (allInitSpecs N)} (rules N)\"
 and a2: \"0 < N\"
 shows \"\\<forall> f. f \\<in> (invariants N) --> formEval f s\"
-proof (rule consistentLemma)
+proof (rule newconsistentLemma)
 show \"newconsistent (invariants N) {andList (allInitSpecs N)} (rules N)\"
 proof (cut_tac a1, unfold newconsistent_def, rule conjI)
 show \"\\<forall> f ini s. f \\<in> (invariants N) --> ini \\<in> {andList (allInitSpecs N)} \
@@ -608,16 +608,23 @@ and b3: \"formEval ini s\"
     have c1: \"%s\"
     by (cut_tac b1, simp)
 %s
-next show \"\\<forall> f r. f \\<in> invariants N --> r \\<in> rules N --> \
-invHoldForRule f r (invariants N)\"
+  ultimately show \"formEval f s\"
+  by auto
+qed
+qed
+next show \"\\<forall> f r s. f \\<in> invariants N --> r \\<in> rules N --> \
+invHoldForRule' s f r (invariants N)\"
 proof ((rule allI)+, (rule impI)+)
-  fix f r
-  assume b1: \"f \\<in> invariants N and b2: r \\<in> rules N\"
+  fix f r s
+  assume b1: \"f \\<in> invariants N\" and b2: \"r \\<in> rules N\"
   have c1: \"%s\"
   by (cut_tac b2, auto)
   %s
-  ultimately show \"invHoldForRule f r (invariants N)\" by blast
+  ultimately show \"invHoldForRule' s f r (invariants N)\" by blast
 qed
+qed
+next show \"s \\<in> reachableSet {andList (allInitSpecs N)} (rules N)\"
+  by (metis a1)
 qed"
   inv_param_constraints
   (String.concat ~sep:"\n" (List.map invs ~f:analyze_inv_on_ini))
@@ -646,7 +653,7 @@ let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varn
   let lemma_invs_on_ini = gen_lemma_invs_on_ini invs in
   let main_lemma = gen_main rules invs in
   sprintf "\
-theory %s imports localesDef
+theory %s imports paraTheory
 begin
 section{*Main definitions*}
 %s\n

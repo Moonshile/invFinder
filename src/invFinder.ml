@@ -399,7 +399,7 @@ module Choose = struct
   (* Check the level of an optional invariant *)
   let check_level ?(must_new=false) inv =
     let inv = simplify inv in
-    if is_tautology inv then
+    if is_tautology (neg inv) then
       tautology inv
     else begin
       try
@@ -594,7 +594,12 @@ module RenameParam = struct
       begin
         match List.find (!pfs_prop_ref) ~f:pfs_are_match with
         | Some(pf) -> pf
-        | None -> List.find_exn (!pfs_rule_ref) ~f:pfs_are_match
+        | None ->
+          begin
+            match List.find (!pfs_rule_ref) ~f:pfs_are_match with
+            | Some(pf) -> pf
+            | None -> pr
+          end
       end
 
   let var_act (Arr(ls)) =
@@ -736,7 +741,9 @@ let fix_relations_with_cinvs cinvs relations =
           let ConcreteProp(_, pfs_prop) = inv in
           begin
             let rel_inv = concrete_prop_2_form rel_cinv in
-            let branch' = RenameParam.form_act ~pfs_rule ~pfs_prop branch in
+            let branch' =
+              RenameParam.form_act ~pfs_rule ~pfs_prop branch
+            in
             let rename_with_cinv (ConcreteProp(Prop(pname, _, _), _)) =
               (* Rename parameters of the actual generated invariant to be
                  consistent with the concrete rule and inv
