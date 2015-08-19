@@ -573,8 +573,8 @@ qed"
   "lemma %sVs%s:
   assumes a1: \"%s\" and
   a2: \"%s\"
-  shows \"invHoldForRule f r (invariants N)\"
-  by (rule noEffect, cut_tac a1 a2, auto)
+  shows \"invHoldForRule' s f r (invariants N)\"
+  by (rule noEffectOnRule, cut_tac a1 a2, auto)
   "
       rn pn
       rule_constraint
