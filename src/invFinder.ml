@@ -365,10 +365,11 @@ module InvLib = struct
       match invs with
       | [] -> None
       | (old, c_old)::invs' ->
-        let res = can_imply inv old in
+        let res = can_imply (neg old) (neg inv) in
         match res with
         | None -> wrapper invs'
         | Some(f) ->
+          let f = simplify (neg f) in
           let ConcreteProp(Prop(pname, _, _), _) = c_old in
           let ConcreteProp(Prop(_, ppds, pform), ppfs) = form_2_concreate_prop f in
           Some (concrete_prop (prop pname ppds pform) ppfs)
