@@ -533,7 +533,7 @@ shows \"invHoldForRule' s f r (invariants N)\" (is \"?P1 s \\<or> ?P2 s \\<or> ?
 proof -
 %s
 %s
-have %s by auto
+have \"%s\" by auto
 %s
 ultimately show \"invHoldForRule' s f r (invariants N)\" by auto
 qed"
@@ -550,7 +550,7 @@ qed"
         (get_pf_name_list pfs_prop)
         (analyze_rels_in_pfs "f" pn pfs_prop)
     )
-    (if conditions = [] then "True" else "\""^String.concat ~sep:"\\<or>" conditions^"\"")
+    (if conditions = [] then "True" else String.concat ~sep:"\\<or>" conditions)
     (String.concat ~sep:"\n" moreovers)
   | AllRuleInst(rn) ->
     let rn = get_rname_of_crname rn in
@@ -574,7 +574,7 @@ qed"
   assumes a1: \"%s\" and
   a2: \"%s\"
   shows \"invHoldForRule f r (invariants N)\"
-  by auto
+  by (rule noEffect, cut_tac a1 a2, auto)
   "
       rn pn
       rule_constraint

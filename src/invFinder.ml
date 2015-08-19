@@ -218,13 +218,13 @@ let rec exp_eval exp ~assigns =
             let f1 =
               let ff = simplify f in
               match ff with
-              | OrList(fl) -> (List.filter fl ~f:(fun f -> not (f = Miracle)))
+              | OrList(fl) -> fl
               | _ -> [ff]
             in
             let f2 =
               let ff = simplify (neg f) in
               match ff with
-              | OrList(fl) -> (List.filter fl ~f:(fun f -> not (f = Miracle)))
+              | OrList(fl) -> fl
               | _ -> [ff]
             in
             let res1 = List.concat (List.map (analyze_exp e1) ~f:(fun (g, e) ->
