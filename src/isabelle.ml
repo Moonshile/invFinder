@@ -95,6 +95,18 @@ let analyze_rels_in_pds ?(quant="") t name pds =
   else
     sprintf "%s\\<and>%s=%s %s %s" param_str_part t name quant (get_pd_name_list pds)
 
+let pds_param_constraints ?(quant="") t name pds =
+  if List.is_empty pds then
+    sprintf "(%s)" (analyze_rels_in_pds ~quant t name pds)
+  else 
+    sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds ~quant t name pds)
+
+let pfs_param_constraints ?(quant="") t name pfs =
+  if List.is_empty pfs then
+    sprintf "(%s)" (analyze_rels_in_pfs ~quant t name pfs)
+  else 
+    sprintf "(\\<exists> %s. %s)" (get_pf_name_list pfs) (analyze_rels_in_pfs ~quant t name pfs)
+
 let gen_tmp_vars n =
   let nums = up_to n in
   List.map nums ~f:(fun i -> sprintf "i%d" i)
@@ -591,7 +603,7 @@ and a2: \"formEval (andList (allInitSpecs N)) s\"
 shows \"formEval f s\"
 using a1 a2 by auto"
       name
-      (sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds))
+      (pds_param_constraints "f" name pds)
   in
   String.concat ~sep:"\n\n" (List.map invs ~f:do_work)
 
