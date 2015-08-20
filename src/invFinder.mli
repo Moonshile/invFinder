@@ -83,5 +83,5 @@ val to_str : t -> string
 *)
 val find : ?smv_escape:(string -> string) ->
   ?smv:string -> ?smv_bmc:string -> ?murphi:string -> Loach.protocol ->
-  (concrete_prop * String.Set.t) list * t list list list
+  (concrete_prop * String.Set.t) list * t list list list list
 

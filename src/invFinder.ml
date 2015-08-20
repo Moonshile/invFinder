@@ -821,7 +821,7 @@ let read_res_cache cinvs =
     List.map tuple2s ~f:(fun t -> Tuple2.get1 t, Tuple2.get2 t)
   in
   let relations =
-    let convertor = List.t_of_sexp (List.t_of_sexp t_of_sexp) in
+    let convertor = List.t_of_sexp (List.t_of_sexp (List.t_of_sexp t_of_sexp)) in
     Storage.get_many (!protocol_name) "relations" [] convertor
   in
   InvLib.pairs := inv_cinv_pairs;
@@ -831,7 +831,7 @@ let read_res_cache cinvs =
 let write_res_cache cinvs new_relations =
   let tuple2s = List.map (!InvLib.pairs) ~f:(fun (f, cinv) -> Tuple2.create f cinv) in
   let invlib_convertor = List.sexp_of_t (Tuple2.sexp_of_t sexp_of_formula sexp_of_concrete_prop) in
-  let rel_convertor = List.sexp_of_t (List.sexp_of_t sexp_of_t) in
+  let rel_convertor = List.sexp_of_t (List.sexp_of_t (List.sexp_of_t sexp_of_t)) in
   Storage.replace (!protocol_name) "cinvs" cinvs (List.sexp_of_t sexp_of_concrete_prop);
   Storage.replace (!protocol_name) "invlib" tuple2s invlib_convertor;
   Storage.add_many (!protocol_name) "relations" new_relations rel_convertor;;
@@ -844,8 +844,8 @@ let tabular_rules_cinvs rname_paraminfo_pairs cinvs =
     | cinv::cinvs' ->
       let (new_cinvs, new_relations) = get_res_of_cinv cinv rname_paraminfo_pairs in
       let cinvs'' = cinvs'@new_cinvs in
-      write_res_cache cinvs'' new_relations;
-      wrapper cinvs'' (relations@new_relations)
+      write_res_cache cinvs'' [new_relations];
+      wrapper cinvs'' (relations@[new_relations])
   in
   let cinvs, relations = read_res_cache cinvs in
   Prt.warning ("initial invs:\n"^String.concat ~sep:"\n" (
@@ -941,5 +941,5 @@ let find ?(smv_escape=(fun inv_str -> inv_str)) ?(smv="") ?(smv_bmc="") ?(murphi
   let rname_paraminfo_pairs = List.map rules ~f:get_rulename_param_pair in
   let (cinvs, relations) = tabular_rules_cinvs rname_paraminfo_pairs cinvs in
   let cinvs_with_inits = check_invs_on_init cinvs init in
-  printf "%s\n" (result_to_str (cinvs, List.concat (List.concat (relations))));
+  printf "%s\n" (result_to_str (cinvs, List.concat (List.concat (List.concat (relations)))));
   (cinvs_with_inits, relations)

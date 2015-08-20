@@ -178,7 +178,6 @@ let () = run_with_cmdline (fun () ->
   let cinvs_with_varnames, relations = find protocol
     ~murphi:(In_channel.read_all "n_g2kLyj.m")
   in
-  let filename = sprintf "%s.thy" protocol.name in
-  Out_channel.write_all filename (Isabelle.protocol_act protocol cinvs_with_varnames relations)
+  Isabelle.protocol_act protocol cinvs_with_varnames relations ()
 )
 

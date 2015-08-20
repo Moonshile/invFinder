@@ -12,6 +12,8 @@ open Paramecium
 open Loach
 open InvFinder
 
+open Isa_base
+
 exception Unsupported of string
 
 let types_ref = ref []
@@ -750,28 +752,89 @@ qed"
 
 
 
-let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varnames relations =
-  types_ref := types;
-  let types_str = String.concat ~sep:"\n" (List.filter_map types ~f:type_act) in
-  let rules_str = rules_act rules in
-  let (cinvs, _) = List.unzip cinvs_with_varnames in
-  let invs_str = invs_act cinvs in
-  let inits_str = inits_act init in
-  let lemmas_str = 
-    String.concat ~sep:"\n\n" (List.map relations ~f:(fun rel -> gen_lemma rel rules))
-  in
-  let invs = List.map cinvs ~f:(fun (ConcreteProp(p, _)) -> p) in
-  let lemma_invs_on_ini = gen_lemma_invs_on_ini invs in
-  let main_lemma = gen_main rules invs in
-  sprintf "\
-theory %s imports paraTheory
+let file_pub name types_str rules_str invs_str inits_str () =
+  let pub_str = sprintf
+"theory %s_base imports paraTheory
 begin
 section{*Main definitions*}
 %s\n
 %s\n
 %s\n
 %s\n
-%s\n
-%s\n
-%s\n
-end\n" name types_str rules_str invs_str inits_str lemmas_str lemma_invs_on_ini main_lemma
+end
+" name types_str rules_str invs_str inits_str in
+  Out_channel.write_all (sprintf "%s/%s_base.thy" name name) pub_str;;
+
+let file_inv name relations rules () =
+  let rec wrapper relations i =
+    match relations with
+    | [] -> ()
+    | rel::relations' ->
+      let strs =
+        String.concat ~sep:"\n\n" (List.map rel ~f:(fun rs -> gen_lemma rs rules))
+      in
+      let lemmas_str = sprintf
+"theory lemma_on_inv%d imports paraTheory %s_base
+begin
+%s
+end
+" i name strs in
+      Out_channel.write_all (sprintf "%s/lemma_on_inv%d.thy" name i) lemmas_str;
+      wrapper relations' (i + 1)
+  in
+  wrapper relations 1;;
+
+let file_init name invs () =
+  let init_str = sprintf
+"theory on_ini imports paraTheory %s_base
+begin
+%s
+end
+" name (gen_lemma_invs_on_ini invs) in
+  Out_channel.write_all (sprintf "%s/on_ini.thy" name) init_str;;
+
+let file_main name rules invs () =
+  let indice = List.map (up_to (List.length invs)) ~f:(fun x -> x + 1) in
+  let lemma_of_invs = String.concat ~sep:" " (List.map indice ~f:(fun i -> 
+    sprintf "lemma_on_inv%d" i
+  )) in
+  let main_str = sprintf
+"theory %s imports paraTheory %s_base %s on_ini
+begin
+%s
+end
+" name name lemma_of_invs (gen_main rules invs) in
+  Out_channel.write_all (sprintf "%s/%s.thy" name name) main_str;;
+
+let file_root name () =
+  let root_str = sprintf
+"session main_Session = HOL +
+    theories
+        %s
+" name in
+  Out_channel.write_all (sprintf "%s/ROOT" name) root_str;;
+
+
+
+
+
+
+
+
+
+let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varnames relations () =
+  types_ref := types;
+  Unix.mkdir_p name;
+  Out_channel.write_all (sprintf "%s/paraTheory.thy" name) Isa_base.para_theory;
+  let types_str = String.concat ~sep:"\n" (List.filter_map types ~f:type_act) in
+  let rules_str = rules_act rules in
+  let (cinvs, _) = List.unzip cinvs_with_varnames in
+  let invs = List.map cinvs ~f:(fun (ConcreteProp(p, _)) -> p) in
+  let invs_str = invs_act cinvs in
+  let inits_str = inits_act init in
+  file_pub name types_str rules_str invs_str inits_str ();
+  file_inv name relations rules ();
+  file_init name invs ();
+  file_main name rules invs ();
+  file_root name ();;
+

@@ -14,5 +14,4 @@ val var_act : Paramecium.var -> string
 val exp_act : Loach.exp -> string
 val formula_act : Loach.formula -> string
 val protocol_act : Loach.protocol -> (InvFinder.concrete_prop * String.Set.t) list ->
-  InvFinder.t list list list -> 
-  string
+  InvFinder.t list list list list -> unit -> unit
