@@ -124,7 +124,7 @@ let simplify form =
       let simplified = List.map (remove_inner_andList form) ~f:wrapper in
       if List.exists simplified ~f:(fun x -> x = Miracle) then miracle
       else begin
-        let not_chaos = List.dedup (List.filter simplified ~f:(fun x -> not (x = Chaos))) in
+        let not_chaos = List.filter simplified ~f:(fun x -> not (x = Chaos)) in
         match not_chaos with
         | [] -> chaos
         | [one] -> one
@@ -139,7 +139,7 @@ let simplify form =
       let simplified = List.map (remove_inner_orList form) ~f:(wrapper) in
       if List.exists simplified ~f:(fun x -> x = Chaos) then chaos
       else begin
-        let not_miracle = List.dedup (List.filter simplified ~f:(fun x -> not (x = Miracle))) in
+        let not_miracle = List.filter simplified ~f:(fun x -> not (x = Miracle)) in
         match not_miracle with
         | [] -> miracle
         | [one] -> one

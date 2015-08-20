@@ -353,7 +353,7 @@ module InvLib = struct
     | None ->
       let cinv = form_2_concreate_prop ~id:(!index) inv in
       incr index;
-      pairs := ((inv, cinv)::(!pairs));
+      pairs := ((!pairs)@[(inv, cinv)]);
       cinv
 
   let add_many invs = List.dedup (List.map invs ~f:add)
@@ -720,7 +720,7 @@ let tabular_expans (Rule(_name, _, form, _), crule, _, assigns) ~cinv =
           deal_with_case_3 crule cinv obligation branch
         end
       in
-      deal_with_case obligations' (relation::relations)
+      deal_with_case obligations' (relations@[relation])
   in
   deal_with_case obligations []
 
@@ -896,7 +896,6 @@ let result_to_str (cinvs, relations) =
   let invs_str =
     cinvs
     |> List.map ~f:concrete_prop_2_form
-    |> List.map ~f:simplify
     |> List.map ~f:ToStr.Smv.form_act
   in
   let relations_str = List.map relations ~f:to_str in

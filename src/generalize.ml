@@ -52,7 +52,7 @@ let components_act components pds pfs ~f =
     | [] -> (pds, pfs, gened_comp)
     | c::components' ->
       let (pds', pfs', c') = f c pds pfs in
-      wrapper components' (c'::gened_comp) pds' pfs'
+      wrapper components' (gened_comp@[c']) pds' pfs'
   in
   wrapper components [] pds pfs
 
