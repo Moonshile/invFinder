@@ -699,6 +699,7 @@ let tabular_expans (Rule(_name, _, form, _), crule, _, assigns) ~cinv =
   let obligations =
     pre_cond inv_inst assigns
     |> List.map ~f:(fun (g, o) -> g, simplify o)
+    |> List.filter ~f:(fun (g, _) -> is_satisfiable g)
   in
   let rec deal_with_case obligations relations =
     match obligations with

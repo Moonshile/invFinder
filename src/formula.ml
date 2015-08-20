@@ -108,6 +108,31 @@ and remove_inner_orList form =
   | Neg(_)
   | Imply(_) -> Prt.error (ToStr.Smv.form_act form); raise Empty_exception
 
+
+let rec forms_dedup forms =
+  let forms' = List.map forms ~f:dedup in
+  let rec wrapper forms res set =
+    match forms with
+    | [] -> res
+    | f::forms' ->
+      begin
+        let key = ToStr.Debug.form_act f in
+        match String.Set.find set ~f:(fun g -> g = key) with
+        | Some(_) -> wrapper forms' res set
+        | None -> wrapper forms' (res@[f]) (String.Set.add set key)
+      end
+  in
+  wrapper forms' [] String.Set.empty
+and dedup form =
+  match form with
+  | Chaos
+  | Miracle
+  | Eqn(_) -> form
+  | Neg(f) -> neg (dedup f)
+  | AndList(fl) -> andList (forms_dedup fl)
+  | OrList(fl) -> orList (forms_dedup fl)
+  | Imply(f1, f2) -> imply (dedup f1) (dedup f2)
+
 (** Simplify a formula *)
 let simplify form =
   let no_imply_neg = eliminate_imply_neg form in
@@ -124,7 +149,7 @@ let simplify form =
       let simplified = List.map (remove_inner_andList form) ~f:wrapper in
       if List.exists simplified ~f:(fun x -> x = Miracle) then miracle
       else begin
-        let not_chaos = List.filter simplified ~f:(fun x -> not (x = Chaos)) in
+        let not_chaos = forms_dedup (List.filter simplified ~f:(fun x -> not (x = Chaos))) in
         match not_chaos with
         | [] -> chaos
         | [one] -> one
@@ -139,7 +164,7 @@ let simplify form =
       let simplified = List.map (remove_inner_orList form) ~f:(wrapper) in
       if List.exists simplified ~f:(fun x -> x = Chaos) then chaos
       else begin
-        let not_miracle = List.filter simplified ~f:(fun x -> not (x = Miracle)) in
+        let not_miracle = forms_dedup (List.filter simplified ~f:(fun x -> not (x = Miracle))) in
         match not_miracle with
         | [] -> miracle
         | [one] -> one
