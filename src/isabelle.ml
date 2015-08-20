@@ -603,33 +603,50 @@ using a1 a2 by auto"
 
 let analyze_rules_invs rules invs =
   let inv_param_constraints =
-    List.map invs ~f:(fun (Paramecium.Prop(name, pds, _)) -> 
-      sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds)
+    List.map invs ~f:(fun (Paramecium.Prop(name, pds, _)) ->
+      if List.is_empty pds then
+        sprintf "(%s)" (analyze_rels_in_pds "f" name pds)
+      else
+        sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds)
     )
     |> String.concat ~sep:" \\<or>\n      "
   in
   let analyze_rule_invs (Rule(rname, pds, _, _)) =
     let analyze_rule_inv (Paramecium.Prop(pname, pds, _)) =
+      let constraints =
+        if List.is_empty pds then
+          sprintf "(%s)" (analyze_rels_in_pds "f" pname pds)
+        else
+          sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" pname pds)
+      in
       sprintf
 "    moreover {
       assume f1: \"%s\"
       have \"invHoldForRule' s f r (invariants N)\"
       by (cut_tac b1 b2 d1 f1, metis %sVs%s)
     }"
-        (sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" pname pds))
+        constraints
         rname pname
     in
     let rule_quant = Hashtbl.find_exn rule_quant_table rname in
+    let rule_constraint =
+      if List.is_empty pds then
+        analyze_rels_in_pds ~quant:rule_quant "r" rname pds
+      else
+        sprintf "\\<exists> %s. %s"
+          (get_pd_name_list pds)
+          (analyze_rels_in_pds ~quant:rule_quant "r" rname pds)
+    in
     sprintf
 "  moreover {
-    assume d1: \"\\<exists> %s. %s\"
+    assume d1: \"%s\"
     have e1: \"%s\"
     by (cut_tac b1, auto)
 %s
     ultimately have \"invHoldForRule' s f r (invariants N)\"
     by blast
   }"
-      (get_pd_name_list pds) (analyze_rels_in_pds ~quant:rule_quant "r" rname pds)
+      rule_constraint
       inv_param_constraints
       (String.concat ~sep:"\n" (List.map invs ~f:(analyze_rule_inv)))
   in
