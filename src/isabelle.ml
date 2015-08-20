@@ -695,7 +695,7 @@ let gen_main rules invs =
       have \"formEval f s\"
       apply (rule iniImply_%s)
       apply (cut_tac d1, assumption)
-      by (cut_tac b4, simp)
+      by (cut_tac b4, assumption)
     }"
       (pds_param_constraints "f" name pds)
       name
