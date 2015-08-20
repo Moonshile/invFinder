@@ -86,9 +86,9 @@ oneAllForm: \"forallForm [i] forms = forms i\"|
 moreAllForm: \"forallForm (i#j#xs)  forms = andForm (forms i) (forallForm (j#xs)  forms)\"
 
 
-fun exitsForm::\"nat list \\<Rightarrow>paraFormula \\<Rightarrow> formula\" where
-oneExForm: \" exitsForm [i] forms = forms i\"|
-moreExForm: \" exitsForm (i#j#xs)  forms = orForm (forms i) (forallForm (j#xs)  forms)\"
+fun existsForm::\"nat list \\<Rightarrow>paraFormula \\<Rightarrow> formula\" where
+oneExForm: \" existsForm [i] forms = forms i\"|
+moreExForm: \" existsForm (i#j#xs)  forms = orForm (forms i) (forallForm (j#xs)  forms)\"
 
 
 
@@ -1613,6 +1613,5 @@ proof -
   then show \"?P1 s \\<or> ?P2 s \\<or> ?P3 s\"
   by auto
 qed
+end"
 
-end
-"
