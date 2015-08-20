@@ -695,7 +695,7 @@ let gen_main rules invs =
       apply (cut_tac d1, assumption)
       by (cut_tac b4, simp)
     }"
-      (sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds))
+      (pds_param_constraints "f" name pds)
       name
   in
   sprintf
