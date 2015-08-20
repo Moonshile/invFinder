@@ -464,7 +464,9 @@ let gen_inst relations condition =
       | [] -> ""
       | _ -> sprintf "\\<exists> %s. %s\\<and>" (get_pf_name_list overflow) param_rels
     in
-    let branch_str = sprintf "(%s%s)" branch_constraint (ToIsabelle.form_act g) in
+    let branch_str =
+      sprintf "(%s(formEval %s s))" branch_constraint (formula_act (paramecium_form_to_loach g))
+    in
     let case_str =
       match relation with
       | InvHoldForRule1 -> gen_case_1
