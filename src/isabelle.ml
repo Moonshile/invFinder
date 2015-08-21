@@ -450,7 +450,7 @@ let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
   let f = paramecium_form_to_loach f in
   sprintf
 "    have \"?P3 s\"
-    by (cut_tac a1 a2 b1 c1, simp, rule_tac x=\"%s\" in exI, auto)
+    apply (cut_tac a1 a2 b1 c1, simp, rule_tac x=\"%s\" in exI, auto) done
     then have \"invHoldForRule' s f r (invariants N)\" by auto" (formula_act (neg f))
 
 let gen_branch branch case =
@@ -543,7 +543,7 @@ shows \"invHoldForRule' s f r (invariants N)\" (is \"?P1 s \\<or> ?P2 s \\<or> ?
 proof -
 %s
 %s
-have \"%s\" by (cut_tac a1 a2, auto)
+have \"%s\" apply (cut_tac a1 a2, auto) done
 %s
 ultimately show \"invHoldForRule' s f r (invariants N)\" by auto
 qed"
@@ -581,7 +581,7 @@ qed"
   assumes a1: \"%s\" and
   a2: \"%s\"
   shows \"invHoldForRule' s f r (invariants N)\"
-  by (rule noEffectOnRule, cut_tac a1 a2, auto)
+  apply (rule noEffectOnRule, cut_tac a1 a2, auto) done
   "
       rn pn
       rule_constraint
@@ -634,7 +634,7 @@ let analyze_rules_invs rules invs =
 "    moreover {
       assume f1: \"%s\"
       have \"invHoldForRule' s f r (invariants N)\"
-      by (cut_tac b1 b2 d1 f1, metis %sVs%s)
+      apply (cut_tac b1 b2 d1 f1, metis %sVs%s) done
     }"
         constraints
         rname pname
@@ -652,7 +652,7 @@ let analyze_rules_invs rules invs =
 "  moreover {
     assume d1: \"%s\"
     have e1: \"%s\"
-    by (cut_tac b1, auto)
+    apply (cut_tac b1, auto) done
 %s
     ultimately have \"invHoldForRule' s f r (invariants N)\"
     by blast
@@ -692,7 +692,7 @@ let gen_main rules invs =
       have \"formEval f s\"
       apply (rule iniImply_%s)
       apply (cut_tac d1, assumption)
-      by (cut_tac b4, (assumption)+)
+      apply (cut_tac b4, (assumption)+) done
     }"
       (pds_param_constraints "f" name pds)
       name
@@ -712,11 +712,11 @@ proof ((rule allI)+, (rule impI)+)
   assume b1: \"f \\<in> (invariants N)\" and b2: \"ini \\<in> {andList (allInitSpecs N)}\" \
 and b3: \"formEval ini s\"
   have b4: \"formEval (andList (allInitSpecs N)) s\"
-  by (cut_tac b2 b3, simp)
+  apply (cut_tac b2 b3, simp) done
   show \"formEval f s\"
   proof -
     have c1: \"%s\"
-    by (cut_tac b1, simp)
+    apply (cut_tac b1, simp) done
 %s
   ultimately show \"formEval f s\"
   by auto
@@ -728,13 +728,13 @@ proof ((rule allI)+, (rule impI)+)
   fix f r s
   assume b1: \"f \\<in> invariants N\" and b2: \"r \\<in> rules N\"
   have c1: \"%s\"
-  by (cut_tac b2, auto)
+  apply (cut_tac b2, auto) done
   %s
   ultimately show \"invHoldForRule' s f r (invariants N)\" by blast
 qed
 qed
 next show \"s \\<in> reachableSet {andList (allInitSpecs N)} (rules N)\"
-  by (metis a1)
+  apply (metis a1) done
 qed"
   inv_param_constraints
   (String.concat ~sep:"\n" (List.map invs ~f:analyze_inv_on_ini))
@@ -771,7 +771,7 @@ let file_inv name relations rules () =
         String.concat ~sep:"\n\n" (List.map rel ~f:(fun rs -> gen_lemma rs rules))
       in
       let lemmas_str = sprintf
-"theory lemma_on_inv%d imports paraTheory %s_base
+"theory lemma_on_inv%d imports %s_base
 begin
 %s
 end
@@ -783,7 +783,7 @@ end
 
 let file_init name invs () =
   let init_str = sprintf
-"theory on_ini imports paraTheory %s_base
+"theory on_ini imports %s_base
 begin
 %s
 end
@@ -796,7 +796,7 @@ let file_main name rules invs () =
     sprintf "lemma_on_inv%d" i
   )) in
   let main_str = sprintf
-"theory %s imports paraTheory %s_base %s on_ini
+"theory %s imports %s_base %s on_ini
 begin
 %s
 end
