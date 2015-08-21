@@ -540,7 +540,7 @@ shows \"invHoldForRule' s f r (invariants N)\" (is \"?P1 s \\<or> ?P2 s \\<or> ?
 proof -
 %s
 %s
-have \"%s\" by auto
+have \"%s\" by (cut_tac a1 a2, auto)
 %s
 ultimately show \"invHoldForRule' s f r (invariants N)\" by auto
 qed"
@@ -689,7 +689,7 @@ let gen_main rules invs =
       have \"formEval f s\"
       apply (rule iniImply_%s)
       apply (cut_tac d1, assumption)
-      by (cut_tac b4, assumption)
+      by (cut_tac b4, (assumption)+)
     }"
       (pds_param_constraints "f" name pds)
       name
@@ -809,13 +809,15 @@ let file_root name () =
   Out_channel.write_all (sprintf "%s/ROOT" name) root_str;;
 
 let file_sh name () =
-  let sh_str = "#!/bin/bash\nisabelle build -v -d . -b main_Session\n" in
+  let sh_str = 
+"#!/bin/bash
+shopt -s expand_aliases
+source ~/.bashrc
+isabelle build -v -d . -b main_Session
+" in
   let filename = sprintf "%s/run.sh" name in
-  try
-    Out_channel.write_all filename sh_str;
-    Unix.chmod filename ~perm:7;
-  with
-  | _ -> ();;
+  Out_channel.write_all filename sh_str;
+  Unix.chmod filename ~perm:0O777;;
 
 
 

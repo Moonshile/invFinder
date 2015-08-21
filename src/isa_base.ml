@@ -1186,7 +1186,7 @@ primrec consOf::\"formula \\<Rightarrow> formula\" where [simp] :
 \"consOf (implyForm A B)=B\"
 
 
-lemma varsOnCat:
+lemma varsOnCat[simp]:
   shows \"varOfSent (cat S1 S2)=(varOfSent S1 ) \\<union> (varOfSent S2 )\"
   apply(induct_tac S1)
 apply (metis (lifting) cat1 varOfSent.simps(1) varOfSent.simps(2))
@@ -1613,5 +1613,6 @@ proof -
   then show \"?P1 s \\<or> ?P2 s \\<or> ?P3 s\"
   by auto
 qed
-end"
+end
+"
 
