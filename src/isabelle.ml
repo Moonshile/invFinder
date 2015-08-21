@@ -42,8 +42,11 @@ let analyze_rels_among_pfs pfs_lists =
       let r = String.concat ~sep:"\\<and>" (List.filter parts ~f:(fun s -> not (s = ""))) in
       wrapper pfs_lists' (res@[r])
   in
-  List.filter (wrapper pfs_lists []) ~f:(fun s -> not (s = ""))
-  |> String.concat ~sep:"\\<and>"
+  let res =
+    List.filter (wrapper pfs_lists []) ~f:(fun s -> not (s = ""))
+    |> String.concat ~sep:"\\<and>"
+  in
+  if res = "" then "True" else res
 
 let get_pf_name_list pfs =
   String.concat ~sep:" " (List.map pfs ~f:(fun pf ->
@@ -501,7 +504,7 @@ let analyze_lemma rels pfs_prop =
       pfs
   in
   let condition = sprintf "(%s)" (analyze_rels_among_pfs [pfs; pfs_prop]) in
-  let moreovers = gen_inst rels (if condition = "" then "True" else condition) in
+  let moreovers = gen_inst rels condition in
   condition, moreovers
 
 let gen_lemma relations rules =
