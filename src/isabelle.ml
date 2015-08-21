@@ -67,7 +67,7 @@ let analyze_rels_in_pfs ?(quant="") t name pfs =
     |> String.concat ~sep:"\\<and>"
   in
   if List.is_empty pfs then
-    sprintf "%s=%s %s" t name (get_pf_name_list pfs)
+    sprintf "%s=%s %s %s" t name quant (get_pf_name_list pfs)
   else
     sprintf "%s\\<and>%s=%s %s %s" param_str_part t name quant (get_pf_name_list pfs)
 
@@ -93,7 +93,7 @@ let analyze_rels_in_pds ?(quant="") t name pds =
     |> String.concat ~sep:"\\<and>"
   in
   if List.is_empty pds then
-    sprintf "%s=%s %s" t name (get_pd_name_list pds)
+    sprintf "%s=%s %s %s" t name quant (get_pd_name_list pds)
   else
     sprintf "%s\\<and>%s=%s %s %s" param_str_part t name quant (get_pd_name_list pds)
 
@@ -200,8 +200,8 @@ and formula_act f =
   )
   | Imply(f1, f2) -> sprintf "(implyForm %s %s)" (formula_act f1) (formula_act f2)
   | ForallFormula(paramdefs, form) ->
-    quant_in_rule := true;
     begin
+      quant_in_rule := true;
       match paramdefs with
       | [] -> raise Empty_exception
       | [Paramdef(name, tname)] ->
@@ -210,8 +210,8 @@ and formula_act f =
       | _ -> raise (Unsupported "More than 1 paramters in forall are not supported yet")
     end
   | ExistFormula(paramdefs, form) ->
-    quant_in_rule := true;
     begin
+      quant_in_rule := true;
       match paramdefs with
       | [] -> raise Empty_exception
       | [Paramdef(name, tname)] ->
@@ -226,8 +226,8 @@ let statement_act statement =
     match bs with
     | Assign(v, e) -> sprintf "(assign (%s, %s))" (var_act v) (exp_act e)
     | ForStatement(s, pd) ->
-      quant_in_rule := true;
       begin
+        quant_in_rule := true;
         match pd with
         | [] -> raise Empty_exception
         | [Paramdef(name, tname)] ->
@@ -255,17 +255,11 @@ let rule_act r =
   let statements = statement_act s in
   let quant = if (!quant_in_rule) then "N" else "" in
   let quant_type = if (!quant_in_rule) then "nat \\<Rightarrow> " else "" in
-  let constraints =
-    if List.is_empty pds then
-      sprintf "(%s)" (analyze_rels_in_pds ~quant "r" name pds)
-    else
-      sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds ~quant "r" name pds)
-  in
   Hashtbl.replace rule_quant_table ~key:name ~data:quant;
-  constraints,
+  (pds_param_constraints ~quant "r" name pds,
   sprintf "definition %s::\"%s%s\" where [simp]:
 \"%s %s %s\\<equiv>\nlet g = %s in\nlet s = %s in\nguard g s\""
-    name quant_type rule_type name quant pd_names guard statements
+    name quant_type rule_type name quant pd_names guard statements)
 
 let rules_act rs =
   let rule_inst_strs, rules_strs = List.unzip (List.map rs ~f:rule_act) in
