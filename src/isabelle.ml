@@ -808,6 +808,14 @@ let file_root name () =
 " name in
   Out_channel.write_all (sprintf "%s/ROOT" name) root_str;;
 
+let file_sh name () =
+  let sh_str = "#!/bin/bash\nisabelle build -v -d . -b main_Session\n" in
+  let filename = sprintf "%s/run.sh" name in
+  try
+    Out_channel.write_all filename sh_str;
+    Unix.chmod filename ~perm:7;
+  with
+  | _ -> ();;
 
 
 
@@ -830,5 +838,6 @@ let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varn
   file_inv name relations rules ();
   file_init name invs ();
   file_main name rules invs ();
-  file_root name ();;
+  file_root name ();
+  file_sh name ();;
 
