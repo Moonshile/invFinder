@@ -500,7 +500,7 @@ let analyze_lemma rels pfs_prop =
       let ConcreteRule(_, pfs) = rule in
       pfs
   in
-  let condition = analyze_rels_among_pfs [pfs; pfs_prop] in
+  let condition = sprintf "(%s)" (analyze_rels_among_pfs [pfs; pfs_prop]) in
   let moreovers = gen_inst rels (if condition = "" then "True" else condition) in
   condition, moreovers
 
