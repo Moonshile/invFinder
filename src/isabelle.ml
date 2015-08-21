@@ -551,12 +551,12 @@ qed"
     rule_constraint
     prop_constraint
     (if List.is_empty pfs_r then "" else
-      sprintf "from a1 obtain %s where a1:\"%s\" by blast"
+      sprintf "from a1 obtain %s where a1:\"%s\" apply fastforce done"
         (get_pf_name_list pfs_r)
         (analyze_rels_in_pfs ~quant:(Hashtbl.find_exn rule_quant_table rn) "r" rn pfs_r)
     )
     (if List.is_empty pfs_prop then "" else
-      sprintf "from a2 obtain %s where a2:\"%s\" by blast"
+      sprintf "from a2 obtain %s where a2:\"%s\" apply fastforce done"
         (get_pf_name_list pfs_prop)
         (analyze_rels_in_pfs "f" pn pfs_prop)
     )
@@ -655,7 +655,7 @@ let analyze_rules_invs rules invs =
     apply (cut_tac b1, auto) done
 %s
     ultimately have \"invHoldForRule' s f r (invariants N)\"
-    by blast
+    apply fastforce done
   }"
       rule_constraint
       inv_param_constraints
@@ -730,7 +730,7 @@ proof ((rule allI)+, (rule impI)+)
   have c1: \"%s\"
   apply (cut_tac b2, auto) done
   %s
-  ultimately show \"invHoldForRule' s f r (invariants N)\" by blast
+  ultimately show \"invHoldForRule' s f r (invariants N)\" apply fastforce done
 qed
 qed
 next show \"s \\<in> reachableSet {andList (allInitSpecs N)} (rules N)\"
