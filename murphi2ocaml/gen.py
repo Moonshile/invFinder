@@ -731,7 +731,8 @@ let protocol = {
   rules;
   properties;
 }\n\nlet () = run_with_cmdline (fun () ->
-  let cinvs, relations = find protocol
+  let protocol = preprocess_rule_guard ~loach:protocol in
+  let cinvs_with_varnames, relations = find protocol
     ~murphi:(In_channel.read_all "%s.m")
   in
   Isabelle.protocol_act protocol cinvs_with_varnames relations ()
