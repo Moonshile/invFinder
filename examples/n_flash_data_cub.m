@@ -124,6 +124,7 @@ startstate "Init"
     Sta.Proc[p].ProcCmd := NODE_None;
     Sta.Proc[p].InvMarked := false;
     Sta.Proc[p].CacheState := CACHE_I;
+    Sta.Proc[p].CacheData := d;
     Sta.Dir.ShrSet[p] := false;
     Sta.Dir.InvSet[p] := false;
     Sta.UniMsg[p].Cmd := UNI_None;
@@ -136,6 +137,7 @@ startstate "Init"
   Sta.HomeProc.ProcCmd := NODE_None;
   Sta.HomeProc.InvMarked := false;
   Sta.HomeProc.CacheState := CACHE_I;
+  Sta.HomeProc.CacheData := d;
   Sta.Dir.HomeShrSet := false;
   Sta.Dir.HomeInvSet := false;
   Sta.HomeUniMsg.Cmd := UNI_None;
