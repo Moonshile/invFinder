@@ -32,6 +32,7 @@ CHECK_INV_BY_MU = '9'
 
 smt2_pool = {}
 smv_pool = {}
+smv_process_pool = {}
 smv_bmc_pool = {}
 mu_pool = {}
 
@@ -50,6 +51,18 @@ def gen_smv_file(name, content, name_add=""):
             f.write(content)
     return new_smv_file, smv_file
 
+def gen_smv_process(name, content, name_add=""):
+    smv_file = SMV_FILE_DIR + hashlib.md5(content).hexdigest() + name_add + '.smv'
+    if os.path.isfile(smv_file) and smv_file in smv_process_pool:
+        smv_pool[name] = smv_file
+    else:
+        with open(smv_file, 'w') as f:
+            f.write(content)
+        smv_pool[name] = smv_file
+        if __verbose: print "Start to compute reachable set"
+        smv = SMV(SMV_PATH, smv_file, timeout=TIME_OUT)
+        smv_process_pool[smv_file] = smv
+        smv.go_and_compute_reachable()
 
 def serv(conn, addr):
     data = ''
@@ -78,20 +91,14 @@ def serv(conn, addr):
         # There are many ',' in smv file, so should concat the parts splited
         name = cmd[2]
         content = ','.join(cmd[3:])
-        new_smv_file, smv_file = gen_smv_file(name, content)
-        if new_smv_file or name not in smv_pool:
-            if __verbose: print "Start to compute reachable set"
-            smv = SMV(SMV_PATH, smv_file, timeout=TIME_OUT)
-            if name in smv_pool: smv_pool[name].exit()
-            smv_pool[name] = smv
-            res = smv.go_and_compute_reachable()
+        gen_smv_process(name, content)
         conn.sendall(OK)
     elif cmd[0] == QUERY_REACHABLE:
         """
         In this case, cmd should be [length, command, command_id, name]
         """
         if cmd[2] in smv_pool:
-            res = smv_pool[cmd[2]].query_reachable()
+            res = smv_process_pool[smv_pool[cmd[2]]].query_reachable()
             conn.sendall(','.join([OK, res]) if res else WAITING)
         else:
             conn.sendall(ERROR)
@@ -100,7 +107,7 @@ def serv(conn, addr):
         In this case, cmd should be [length, command, command_id, name, inv]
         """
         if cmd[2] in smv_pool:
-            res = smv_pool[cmd[2]].check(cmd[3])
+            res = smv_process_pool[smv_pool[cmd[2]]].check(cmd[3])
             conn.sendall(','.join([OK, res]))
         else:
             conn.sendall(ERROR)
@@ -109,7 +116,8 @@ def serv(conn, addr):
         In this case, cmd should be [length, command, command_id, name]
         """
         if cmd[2] in smv_pool:
-            smv_pool[cmd[2]].exit()
+            smv_process_pool[smv_pool[cmd[2]]].exit()
+            del smv_process_pool[smv_pool[cmd[2]]]
             del smv_pool[cmd[2]]
             conn.sendall(OK)
         else:
