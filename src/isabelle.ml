@@ -437,24 +437,27 @@ end
 
 
 let gen_case_1 indent cut_tacs =
+  let cmd = if cut_tacs = "" then "show" else "have" in
   sprintf
 "  %shave \"?P1 s\"
   %sproof(cut_tac a1 a2 %s, auto) qed
-  %sthen have \"invHoldForRule' s f r (invariants N)\" by auto" indent indent cut_tacs indent
+  %sthen %s \"invHoldForRule' s f r (invariants N)\" by auto" indent indent cut_tacs indent cmd
 
 let gen_case_2 indent cut_tacs =
+  let cmd = if cut_tacs = "" then "show" else "have" in
   sprintf
 "  %shave \"?P2 s\"
   %sproof(cut_tac a1 a2 %s, auto) qed
-  %sthen have \"invHoldForRule' s f r (invariants N)\" by auto" indent indent cut_tacs indent
+  %sthen %s \"invHoldForRule' s f r (invariants N)\" by auto" indent indent cut_tacs indent cmd
 
 let gen_case_3 indent cut_tacs (ConcreteProp(Prop(_, _, f), _)) =
+  let cmd = if cut_tacs = "" then "show" else "have" in
   let f = paramecium_form_to_loach f in
   sprintf
 "  %shave \"?P3 s\"
   %sapply (cut_tac a1 a2 %s, simp, rule_tac x=\"%s\" in exI, auto) done
-  %sthen have \"invHoldForRule' s f r (invariants N)\" by auto"
-    indent indent cut_tacs (formula_act (neg f)) indent
+  %sthen %s \"invHoldForRule' s f r (invariants N)\" by auto"
+    indent indent cut_tacs (formula_act (neg f)) indent cmd
 
 let gen_branch branch case =
   sprintf "  moreover {\n    assume c1: \"%s\"\n%s\n  }" branch case
@@ -505,7 +508,7 @@ let gen_inst relations condition has_outer_moreover =
       sprintf
 "have \"%s\" by auto
 %s
-ultimately have \"invHoldForRule' s f r (invariants N)\" by auto"
+ultimately show \"invHoldForRule' s f r (invariants N)\" by auto"
         (String.concat ~sep:"\\<or>" branches) (String.concat ~sep:"\n" moreovers)
     end
   else begin
