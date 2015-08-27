@@ -436,30 +436,31 @@ end
 
 
 
-let gen_case_1 indent conditions =
+let gen_case_1 indent cut_tacs =
   sprintf
 "  %shave \"?P1 s\"
-  %sproof(cut_tac a1 a2 b1 %s, auto) qed
-  %sthen have \"invHoldForRule' s f r (invariants N)\" by auto" indent indent conditions indent
+  %sproof(cut_tac a1 a2 %s, auto) qed
+  %sthen have \"invHoldForRule' s f r (invariants N)\" by auto" indent indent cut_tacs indent
 
-let gen_case_2 indent conditions =
+let gen_case_2 indent cut_tacs =
   sprintf
 "  %shave \"?P2 s\"
-  %sproof(cut_tac a1 a2 b1 %s, auto) qed
-  %sthen have \"invHoldForRule' s f r (invariants N)\" by auto" indent indent conditions indent
+  %sproof(cut_tac a1 a2 %s, auto) qed
+  %sthen have \"invHoldForRule' s f r (invariants N)\" by auto" indent indent cut_tacs indent
 
-let gen_case_3 indent conditions (ConcreteProp(Prop(_, _, f), _)) =
+let gen_case_3 indent cut_tacs (ConcreteProp(Prop(_, _, f), _)) =
   let f = paramecium_form_to_loach f in
   sprintf
 "  %shave \"?P3 s\"
-  %sapply (cut_tac a1 a2 b1 %s, simp, rule_tac x=\"%s\" in exI, auto) done
+  %sapply (cut_tac a1 a2 %s, simp, rule_tac x=\"%s\" in exI, auto) done
   %sthen have \"invHoldForRule' s f r (invariants N)\" by auto"
-    indent indent conditions (formula_act (neg f)) indent
+    indent indent cut_tacs (formula_act (neg f)) indent
 
 let gen_branch branch case =
   sprintf "  moreover {\n    assume c1: \"%s\"\n%s\n  }" branch case
 
-let gen_inst relations condition =
+let gen_inst relations condition has_outer_moreover =
+  let cut_tacs = if has_outer_moreover then "b1" else "" in
   (* if has many branches *)
   if List.length relations > 1 then
     let analyze_branch {rule; inv; branch; relation} =
@@ -485,42 +486,49 @@ let gen_inst relations condition =
       in
       let case_str =
         match relation with
-        | InvHoldForRule1 -> gen_case_1 "  " "c1"
-        | InvHoldForRule2 -> gen_case_2 "  " "c1"
-        | InvHoldForRule3(cp) -> gen_case_3 "  " "c1" cp
+        | InvHoldForRule1 -> gen_case_1 "  " (cut_tacs^" c1")
+        | InvHoldForRule2 -> gen_case_2 "  " (cut_tacs^" c1")
+        | InvHoldForRule3(cp) -> gen_case_3 "  " (cut_tacs^" c1") cp
       in
       branch_str, gen_branch branch_str case_str
     in
     let branches, moreovers = List.unzip (List.map relations ~f:analyze_branch) in
+    if has_outer_moreover then
       sprintf
 "moreover {
   assume b1: \"%s\"
   have \"%s\" by auto
 %s
   ultimately have \"invHoldForRule' s f r (invariants N)\" by auto
-}"
-        condition
-        (String.concat ~sep:"\\<or>" branches)
-        (String.concat ~sep:"\n" moreovers)
+}" condition (String.concat ~sep:"\\<or>" branches) (String.concat ~sep:"\n" moreovers)
+    else begin
+      sprintf
+"have \"%s\" by auto
+%s
+ultimately have \"invHoldForRule' s f r (invariants N)\" by auto"
+        (String.concat ~sep:"\\<or>" branches) (String.concat ~sep:"\n" moreovers)
+    end
   else begin
     (* if there is only one TRUE branch *)
     let [{rule=_; inv=_; branch=_; relation}] = relations in
     let case_str =
       match relation with
-      | InvHoldForRule1 -> gen_case_1 "" ""
-      | InvHoldForRule2 -> gen_case_2 "" ""
-      | InvHoldForRule3(cp) -> gen_case_3 "" "" cp
+      | InvHoldForRule1 -> gen_case_1 "" cut_tacs
+      | InvHoldForRule2 -> gen_case_2 "" cut_tacs
+      | InvHoldForRule3(cp) -> gen_case_3 "" cut_tacs cp
     in
-    sprintf
+    if has_outer_moreover then
+      sprintf
 "moreover {
   assume b1: \"%s\"
 %s
-}"
-        condition
-        case_str
+}" condition case_str
+    else begin
+      case_str
+    end
   end
 
-let analyze_lemma rels pfs_prop =
+let analyze_lemma rels pfs_prop has_outer_moreover =
   let pfs =
     match rels with
     | [] -> raise Empty_exception
@@ -529,7 +537,7 @@ let analyze_lemma rels pfs_prop =
       pfs
   in
   let condition = sprintf "(%s)" (analyze_rels_among_pfs [pfs; pfs_prop]) in
-  let moreovers = gen_inst rels condition in
+  let moreovers = gen_inst rels condition has_outer_moreover in
   condition, moreovers
 
 let gen_lemma relations rules =
@@ -539,27 +547,29 @@ let gen_lemma relations rules =
     | _ -> raise Empty_exception
   in
   let ConcreteProp(Prop(pn, _, _), pfs_prop) = cinv in
-  let prop_constraint =
-    if List.is_empty pfs_prop then
-      sprintf "%s" (analyze_rels_in_pfs "f" pn pfs_prop)
-    else
-      sprintf "\\<exists> %s. %s"
-        (get_pf_name_list pfs_prop) (analyze_rels_in_pfs "f" pn pfs_prop)
-  in
+  let prop_constraint = pfs_param_constraints "f" pn pfs_prop in
   match crule with
   | ConcreteRule(rn, pfs_r) ->
     let rn = get_rname_of_crname rn in
-    let res = List.map relations ~f:(fun rels -> analyze_lemma rels pfs_prop) in
-    let conditions, moreovers = List.unzip res in
     let rule_constraint =
-      if List.is_empty pfs_r then
-        analyze_rels_in_pfs ~quant:(Hashtbl.find_exn rule_quant_table rn) "r" rn pfs_r
-      else
-        sprintf "\\<exists> %s. %s"
-          (get_pf_name_list pfs_r)
-          (analyze_rels_in_pfs ~quant:(Hashtbl.find_exn rule_quant_table rn) "r" rn pfs_r)
+      pfs_param_constraints ~quant:(Hashtbl.find_exn rule_quant_table rn) "r" rn pfs_r
     in
-    let conditions = List.filter conditions ~f:(fun s -> not (s = "")) in
+    let outer_moreovers =
+      match relations with
+      | [rels] ->
+        let _, moreover = analyze_lemma rels pfs_prop false in
+        moreover
+      | _ ->
+        let res = List.map relations ~f:(fun rels -> analyze_lemma rels pfs_prop true) in
+        let conditions, moreovers = List.unzip res in
+        let conditions = List.filter conditions ~f:(fun s -> not (s = "")) in
+        sprintf
+"have \"%s\" apply (cut_tac a1 a2, auto) done
+%s
+ultimately show \"invHoldForRule' s f r (invariants N)\" by auto"
+          (String.concat ~sep:"\\<or>" conditions)
+          (String.concat ~sep:"\n" moreovers)
+    in
     sprintf
 "lemma %sVs%s:
 assumes a1: \"%s\" and
@@ -568,9 +578,7 @@ shows \"invHoldForRule' s f r (invariants N)\" (is \"?P1 s \\<or> ?P2 s \\<or> ?
 proof -
 %s
 %s
-have \"%s\" apply (cut_tac a1 a2, auto) done
 %s
-ultimately show \"invHoldForRule' s f r (invariants N)\" by auto
 qed"
     rn pn
     rule_constraint
@@ -585,8 +593,7 @@ qed"
         (get_pf_name_list pfs_prop)
         (analyze_rels_in_pfs "f" pn pfs_prop)
     )
-    (if conditions = [] then "True" else String.concat ~sep:"\\<or>" conditions)
-    (String.concat ~sep:"\n" moreovers)
+    outer_moreovers
   | AllRuleInst(rn) ->
     let rn = get_rname_of_crname rn in
     match List.find rules ~f:(fun (Rule(n, _, _, _)) -> rn = n) with
