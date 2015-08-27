@@ -51,6 +51,7 @@ end
 (*----------------------------- Module To Debug String ----------------------------------*)
 
 module Debug : sig
+  val ignore_paramref : bool ref
   val const_act : const -> string
   val paramref_act : paramref -> string
   val paramdef_act : paramdef -> string

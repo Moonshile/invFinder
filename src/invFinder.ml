@@ -739,6 +739,28 @@ let compute_rule_inst_names rname_paraminfo_pairs prop_pds =
       |> List.map ~f:(fun pfs -> get_rule_inst_name rname pfs)
   )
 
+let reorder_formList sour template =
+  let rec wrapper sour template res =
+    match template with
+    | [] -> res
+    | t::template' ->
+      let rec find_in_sour sour others =
+        match sour with
+        | [] -> raise Empty_exception
+        | s::sour' ->
+          if ToStr.Debug.form_act t = ToStr.Debug.form_act s then
+            s, others@sour'
+          else
+            find_in_sour sour' (others@[s])
+      in
+      let f, sour' = find_in_sour sour [] in
+      wrapper sour' template' (res@[f])
+  in
+  ToStr.Debug.ignore_paramref := true;
+  let res = wrapper sour template [] in
+  ToStr.Debug.ignore_paramref := false;
+  res
+
 let fix_relations_with_cinvs cinvs relations =
   let pairs = List.map cinvs ~f:(fun cinv -> concrete_prop_2_form cinv, cinv) in
   if pairs = [] then () else begin
@@ -757,15 +779,26 @@ let fix_relations_with_cinvs cinvs relations =
           let ConcreteProp(_, pfs_prop) = inv in
           begin
             let rel_inv = concrete_prop_2_form rel_cinv in
-            let rename_with_cinv (ConcreteProp(Prop(pname, _, _), _)) =
-              (* Rename parameters of the actual generated invariant to be
-                 consistent with the concrete rule and inv
-              *)
-              let renamed = RenameParam.form_act ~pfs_rule ~pfs_prop rel_inv in
-              let ConcreteProp(Prop(_, ppds, pform), ppfs) =
-                form_2_concreate_prop ~rename:false renamed
+            (* Rename parameters of the actual generated invariant to be
+               consistent with the concrete rule and inv
+            *)
+            let renamed = RenameParam.form_act ~pfs_rule ~pfs_prop rel_inv in
+            let ConcreteProp(Prop(_, ppds, pform), ppfs) =
+              form_2_concreate_prop ~rename:false renamed
+            in
+            let rename_with_cinv (ConcreteProp(Prop(pname, _, cform), _)) =
+              let reordered =
+                match pform with
+                | AndList(fl) ->
+                  let AndList(template_inv) = cform in
+                  andList (reorder_formList fl template_inv)
+                | _ -> pform
               in
-              concrete_prop (prop pname ppds pform) ppfs
+              let res = concrete_prop (prop pname ppds reordered) ppfs in
+              let before = ToStr.Smv.form_act renamed in
+              let after = ToStr.Smv.form_act (concrete_prop_2_form res) in
+              if not (before = after) then Prt.info ("Reorder "^before^" to "^after) else ();
+              res
             in
             match List.find pairs ~f:(fun (inv, _) -> symmetry_form inv rel_inv = 0) with
             | Some(_, cinv) ->
@@ -806,7 +839,7 @@ let get_res_of_cinv cinv rname_paraminfo_pairs =
     )
   in
   let new_invs, new_relations =
-  let invs, rels = List.unzip (List.map crules ~f:(fun r_insts ->
+    let invs, rels = List.unzip (List.map crules ~f:(fun r_insts ->
       List. unzip (List.map r_insts ~f:(fun r_inst ->
         List.unzip (tabular_expans r_inst ~cinv)
       ))

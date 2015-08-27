@@ -15,6 +15,8 @@ open Core.Std
 (** Translate to Debug string *)
 module Debug = struct
 
+  let ignore_paramref = ref false
+
   (* Translate a const to Debug const *)
   let const_act c =
     "const "^
@@ -27,6 +29,7 @@ module Debug = struct
 
   (** Translate a paramref to Debug string *)
   let paramref_act pr =
+    if (!ignore_paramref) then "[iii]" else
     match pr with
     | Paramfix(vname, tname, c) -> sprintf "[%s:%s:%s]" (const_act c) tname vname
     | Paramref(name) -> sprintf "[%s:__ref__]" name
@@ -48,7 +51,8 @@ module Debug = struct
     | Const(c) -> const_act c
     | Var(v) -> var_act v
     | Param(pr) -> paramref_act pr
-    | Ite(f, e1, e2) -> sprintf "ite (%s) (%s) (%s)" (form_act f) (exp_act e1) (exp_act e2)
+    | Ite(f, e1, e2) ->
+      sprintf "ite (%s) (%s) (%s)" (form_act f) (exp_act e1) (exp_act e2)
   (** Translate formula to Debug string
 
       @param form the formula to be translated
@@ -61,11 +65,11 @@ module Debug = struct
     | Eqn(e1, e2) -> sprintf "(%s = %s)" (exp_act e1) (exp_act e2)
     | Neg(form) -> sprintf "(!%s)" (form_act form)
     | AndList(fl) ->
-      List.map fl ~f:form_act
+      List.map fl ~f:(form_act)
       |> reduce ~default:"TRUE" ~f:(fun res x -> sprintf "%s & %s" res x)
       |> sprintf "(%s)"
     | OrList(fl) ->
-      List.map fl ~f:form_act
+      List.map fl ~f:(form_act)
       |> reduce ~default:"FALSE" ~f:(fun res x -> sprintf "%s | %s" res x)
       |> sprintf "(%s)"
     | Imply(f1, f2) -> sprintf "(%s -> %s)" (form_act f1) (form_act f2)
@@ -290,7 +294,8 @@ module Smv = struct
         | Paramref(_) -> raise Unexhausted_inst
       )
     | Ite(f, e1, e2) ->
-      sprintf "case\n%s : %s; TRUE : %s;\nesac" (form_act f) (exp_act e1) (exp_act e2)
+      let lower = (!strc_to_lower) in
+      sprintf "case\n%s : %s; TRUE : %s;\nesac" (form_act ~lower f) (exp_act e1) (exp_act e2)
   (** Translate formula to smv string
 
       @param form the formula to be translated
