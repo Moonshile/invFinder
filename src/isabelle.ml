@@ -576,20 +576,18 @@ assumes a1: \"%s\" and
 a2: \"%s\"
 shows \"invHoldForRule' s f r (invariants N)\" (is \"?P1 s \\<or> ?P2 s \\<or> ?P3 s\")
 proof -
-%s
-%s
-%s
+%s%s%s
 qed"
     rn pn
     rule_constraint
     prop_constraint
     (if List.is_empty pfs_r then "" else
-      sprintf "from a1 obtain %s where a1:\"%s\" apply fastforce done"
+      sprintf "from a1 obtain %s where a1:\"%s\" apply fastforce done\n"
         (get_pf_name_list pfs_r)
         (analyze_rels_in_pfs ~quant:(Hashtbl.find_exn rule_quant_table rn) "r" rn pfs_r)
     )
     (if List.is_empty pfs_prop then "" else
-      sprintf "from a2 obtain %s where a2:\"%s\" apply fastforce done"
+      sprintf "from a2 obtain %s where a2:\"%s\" apply fastforce done\n"
         (get_pf_name_list pfs_prop)
         (analyze_rels_in_pfs "f" pn pfs_prop)
     )

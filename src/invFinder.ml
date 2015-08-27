@@ -837,7 +837,7 @@ let write_res_cache cinvs new_relations =
   Storage.add_many (!protocol_name) "relations" new_relations rel_convertor;;
 
 (* Find new inv and relations with concrete rules and a concrete invariant *)
-let tabular_rules_cinvs rname_paraminfo_pairs cinvs =
+let tabular_rules_cinvs rname_paraminfo_pairs cinvs relations =
   let rec wrapper cinvs relations =
     match cinvs with
     | [] -> (InvLib.get_all_cinvs (), relations)
@@ -847,10 +847,6 @@ let tabular_rules_cinvs rname_paraminfo_pairs cinvs =
       write_res_cache cinvs'' [new_relations];
       wrapper cinvs'' (relations@[new_relations])
   in
-  let cinvs, relations = read_res_cache cinvs in
-  Prt.warning ("initial invs:\n"^String.concat ~sep:"\n" (
-    List.map cinvs ~f:(fun cinv -> ToStr.Smv.form_act (concrete_prop_2_form cinv))
-  ));
   wrapper cinvs relations
 
 
@@ -919,20 +915,27 @@ let find ?(smv_escape=(fun inv_str -> inv_str)) ?(smv="") ?(smv_bmc="") ?(murphi
       SmvBmc.set_context name (Loach.ToSmv.protocol_act ~limit_param:false protocol)
     else begin SmvBmc.set_context name smv_bmc end
   in
-  let _smv_context =
-    if smv = "" then Smv.set_context ~escape:smv_escape name (Loach.ToSmv.protocol_act protocol)
-    else begin Smv.set_context ~escape:smv_escape name smv end
-  in
   type_defs := types;
   protocol_name := name;
   cache_vars_of_rules rules;
-  let cinvs =
+  let init_cinvs =
     let invs =
       List.concat (List.map properties ~f:simplify_prop)
       |> List.map ~f:(normalize ~types:(!type_defs))
     in
     let indice = up_to (List.length invs) in
     List.map2_exn invs indice ~f:(fun f id -> form_2_concreate_prop ~id:(id + 1) f)
+  in
+  let cinvs, relations = read_res_cache init_cinvs in
+  Prt.warning ("initial invs:\n"^String.concat ~sep:"\n" (
+    List.map cinvs ~f:(fun cinv -> ToStr.Smv.form_act (concrete_prop_2_form cinv))
+  ));
+  let _smv_context =
+    if List.is_empty cinvs then 0
+    else begin
+      if smv = "" then Smv.set_context ~escape:smv_escape name (Loach.ToSmv.protocol_act protocol)
+      else begin Smv.set_context ~escape:smv_escape name smv end
+    end
   in
   let get_rulename_param_pair r =
     let Paramecium.Rule(rname, paramdefs, _, _) = r in
@@ -941,7 +944,7 @@ let find ?(smv_escape=(fun inv_str -> inv_str)) ?(smv="") ?(smv_bmc="") ?(murphi
     (rname, paramdefs)
   in
   let rname_paraminfo_pairs = List.map rules ~f:get_rulename_param_pair in
-  let (cinvs, relations) = tabular_rules_cinvs rname_paraminfo_pairs cinvs in
+  let (cinvs, relations) = tabular_rules_cinvs rname_paraminfo_pairs cinvs relations in
   let cinvs_with_inits = check_invs_on_init cinvs init in
   printf "%s\n" (result_to_str (cinvs, List.concat (List.concat (List.concat (relations)))));
   (cinvs_with_inits, relations)
