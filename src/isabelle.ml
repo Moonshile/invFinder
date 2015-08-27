@@ -788,23 +788,24 @@ end
   Out_channel.write_all (sprintf "%s/%s_base.thy" name name) pub_str;;
 
 let file_inv name relations rules () =
-  let rec wrapper relations i =
+  let rec wrapper relations =
     match relations with
     | [] -> ()
     | rel::relations' ->
+      let (({rule=_; inv=ConcreteProp(Prop(inv_name, _, _), _); branch=_; relation=_}::_)::_)::_ = rel in
       let strs =
         String.concat ~sep:"\n\n" (List.map rel ~f:(fun rs -> gen_lemma rs rules))
       in
       let lemmas_str = sprintf
-"theory lemma_on_inv%d imports %s_base
+"theory lemma_on_%s imports %s_base
 begin
 %s
 end
-" i name strs in
-      Out_channel.write_all (sprintf "%s/lemma_on_inv%d.thy" name i) lemmas_str;
-      wrapper relations' (i + 1)
+" inv_name name strs in
+      Out_channel.write_all (sprintf "%s/lemma_on_%s.thy" name inv_name) lemmas_str;
+      wrapper relations'
   in
-  wrapper relations 1;;
+  wrapper relations;;
 
 let file_init name invs () =
   let init_str = sprintf
@@ -818,7 +819,7 @@ end
 let file_main name rules invs () =
   let indice = List.map (up_to (List.length invs)) ~f:(fun x -> x + 1) in
   let lemma_of_invs = String.concat ~sep:" " (List.map indice ~f:(fun i -> 
-    sprintf "lemma_on_inv%d" i
+    sprintf "lemma_on_inv__%d" i
   )) in
   let main_str = sprintf
 "theory %s imports %s_base %s on_ini
