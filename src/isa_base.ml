@@ -68,11 +68,11 @@ cat2:\"cat (parallel a S1) S=parallel a (cat S1 S)\"
 
 fun parallelList::\"statement list \\<Rightarrow> statement\" where
 \"parallelList [S] = S\"|
-\"parallelList (S1#S2#SL) = cat S1 (parallelList (S2#SL))\" 
+\"parallelList (S1#SL) = cat S1 (parallelList (SL))\" 
 
 fun  forallSent::\"nat list\\<Rightarrow>paraStatement \\<Rightarrow> statement\"  where
 oneSent: \"forallSent ([i])  paraS = paraS i\"|
-moreSent:\" forallSent  (i#j#xs ) paraS=cat (paraS i) (forallSent (j#xs) paraS)  \" 
+moreSent:\" forallSent  (i#xs ) paraS=cat (paraS i) (forallSent (xs) paraS)  \" 
  
 
 text{* The simplest formula is equivalence between expressions. Negation, conjunction, disjunction, and implicattion formulas are also defined. A parameterized formula is just a function from a natural number to a formula.*}
@@ -315,6 +315,12 @@ definition preStateEnable::\" statement \\<Rightarrow> formula \\<Rightarrow> fo
 definition ofImplyForm::\"formula \\<Rightarrow> bool\" where
 \"ofImplyForm f\\<equiv> \\<exists>ant cons. f= implyForm ant cons\"
 
+lemma downNIsNotEmpty:
+  \"\\<exists> j xs. down N= j#xs\" (is \"?P N\")
+  proof(induct_tac N,auto)
+qed   
+
+
 lemma lemmaOnConjsOnVars:
   \" formEval f s \\<longrightarrow>  formEval (conjsOnVars f S) s \"
   apply(induct_tac f)
@@ -428,10 +434,87 @@ next
   show \"( \\<forall>  s. ?Q asgns s chaos)\"
   by auto
 qed
+section{*lemmas on varsOf*}
 lemma varsOfSent1:
   \" (varOfSent S) = set (map fst (statement2Assigns S))\"
   proof(induct_tac S,auto) qed
 
+
+ 
+lemma varsOnCat[simp]:
+  shows \"varOfSent (cat S1 S2)=(varOfSent S1 ) \\<union> (varOfSent S2 )\"
+  apply(induct_tac S1)
+apply (metis (lifting) cat1 varOfSent.simps(1) varOfSent.simps(2))
+by (metis Un_assoc cat2 varOfSent.simps(2))
+  
+
+lemma   forallVars:
+  assumes a1:\"\\<forall> i.( varOfSent (paraForm i))\\<inter> varSet ={}\"
+   shows  \"(varOfSent (forallSent (down N) paraForm))\\<inter> varSet ={}\"
+  proof(induct_tac N)
+    show \" varOfSent (forallSent (down 0) paraForm) \\<inter> varSet = {}\"
+      apply(cut_tac a1,force) 
+      done
+  next
+    fix n
+    assume b1:\"varOfSent (forallSent (down n) paraForm) \\<inter> varSet = {}\"
+    have \" (varOfSent (forallSent (down (Suc n)) paraForm) )  =
+      (varOfSent ( paraForm (Suc n)) ) \\<union>
+      (varOfSent (forallSent (down  n ) paraForm) )\"
+      by (metis (hide_lams, no_types) add_0_right moreSent down.simps(1) down.simps(2) nat.exhaust varsOnCat)
+      then show \"  varOfSent (forallSent (down (Suc n)) paraForm) \\<inter> varSet = {}\"
+      apply(-,cut_tac a1,simp )
+      by (metis (lifting) Int_Un_distrib2 Un_empty_left b1) 
+  qed
+
+lemma   forallVars1[simp,intro!]:
+  assumes a1:\"\\<forall>i. v \\<notin>( varOfSent (paraForm i))\"
+   shows  \"v \\<notin>(varOfSent (forallSent (down N) paraForm))\" (is \"?P N\")
+  proof(induct_tac N)
+    show \"?P 0\"
+      apply(cut_tac a1,force) 
+      done
+  next
+    fix n
+    assume b1:\"?P n\"
+    have \" (varOfSent (forallSent (down (Suc n)) paraForm) )  =
+      (varOfSent ( paraForm (Suc n)) ) \\<union>
+      (varOfSent (forallSent (down  n ) paraForm) )\"
+      by (metis (hide_lams, no_types) add_0_right moreSent down.simps(1) down.simps(2) nat.exhaust varsOnCat)
+      then show \"?P (Suc n) \"
+      apply(-,cut_tac a1,simp )
+      by (metis (lifting) b1)
+  qed
+      
+lemma varsOfForallSentIn[simp]:
+  \"i \\<le>N \\<longrightarrow>v \\<in> varOfSent (paraForm i) \\<longrightarrow> v \\<in> varOfSent (forallSent (down N) paraForm)\" ( is \"?P N\")
+proof(induct_tac N)
+  show \"?P 0\"
+   by auto
+   next
+    fix N
+   assume a1:\"?P N\" 
+   show \"?P (Suc N)\"
+   proof(rule impI)+
+    (*have b0:\"forallSent (Suc N # down ( N)) paraForm=cat (paraForm (Suc N)) (forallSent ( down ( N)) paraForm)\" thm moreSent
+       apply(rule moreSent)*)
+    assume b0:\"i \\<le> Suc N\" and b1:\"  v \\<in> varOfSent (paraForm i)\"  
+    have b2:\"  varOfSent  (forallSent (down (Suc N)) paraForm) = varOfSent (paraForm (Suc N)) \\<union>   varOfSent (forallSent (down N) paraForm)\"
+     by (metis down.simps(2) downNIsNotEmpty paraTheory.moreSent varsOnCat) 
+     have \"i \\<le> N | i=Suc N\" by(cut_tac b0,auto)
+    moreover
+    {assume c1:\"i \\<le> N\"
+     have c2:\" v \\<in>varOfSent (forallSent (down N) paraForm)\" 
+     apply(cut_tac c1 b1 a1,auto) done
+     then have \"v \\<in> varOfSent (forallSent (down (Suc N)) paraForm)\" by(cut_tac c1 c2 b2,auto)
+     }
+     moreover
+    {assume c1:\"i =Suc N\"
+     from c1  have \"v \\<in> varOfSent (forallSent (down (Suc N)) paraForm)\" by(cut_tac c1 b1 b2,auto) 
+     }
+    ultimately show \"v \\<in> varOfSent (forallSent (down (Suc N)) paraForm)\" by blast
+  qed
+  qed
      
 lemma noEffect: shows \"(\\<forall>   s. (varOfExp E) \\<inter>  (varOfSent S) ={} \\<longrightarrow> expEval E s  =  expEval E (trans S s)) \\<and> 
 (\\<forall>s. varOfForm f \\<inter>  (varOfSent S) ={}\\<longrightarrow>
@@ -1186,51 +1269,6 @@ primrec consOf::\"formula \\<Rightarrow> formula\" where [simp] :
 \"consOf (implyForm A B)=B\"
 
 
-lemma varsOnCat[simp]:
-  shows \"varOfSent (cat S1 S2)=(varOfSent S1 ) \\<union> (varOfSent S2 )\"
-  apply(induct_tac S1)
-apply (metis (lifting) cat1 varOfSent.simps(1) varOfSent.simps(2))
-by (metis Un_assoc cat2 varOfSent.simps(2))
-  
-
-lemma   forallVars:
-  assumes a1:\"\\<forall> i.( varOfSent (paraForm i))\\<inter> varSet ={}\"
-   shows  \"(varOfSent (forallSent (down N) paraForm))\\<inter> varSet ={}\"
-  proof(induct_tac N)
-    show \" varOfSent (forallSent (down 0) paraForm) \\<inter> varSet = {}\"
-      apply(cut_tac a1,force) 
-      done
-  next
-    fix n
-    assume b1:\"varOfSent (forallSent (down n) paraForm) \\<inter> varSet = {}\"
-    have \" (varOfSent (forallSent (down (Suc n)) paraForm) )  =
-      (varOfSent ( paraForm (Suc n)) ) \\<union>
-      (varOfSent (forallSent (down  n ) paraForm) )\"
-      by (metis (hide_lams, no_types) add_0_right moreSent down.simps(1) down.simps(2) nat.exhaust varsOnCat)
-      then show \"  varOfSent (forallSent (down (Suc n)) paraForm) \\<inter> varSet = {}\"
-      apply(-,cut_tac a1,simp )
-      by (metis (lifting) Int_Un_distrib2 Un_empty_left b1) 
-  qed
-
-lemma   forallVars1[simp,intro!]:
-  assumes a1:\"\\<forall>i. v \\<notin>( varOfSent (paraForm i))\"
-   shows  \"v \\<notin>(varOfSent (forallSent (down N) paraForm))\" (is \"?P N\")
-  proof(induct_tac N)
-    show \"?P 0\"
-      apply(cut_tac a1,force) 
-      done
-  next
-    fix n
-    assume b1:\"?P n\"
-    have \" (varOfSent (forallSent (down (Suc n)) paraForm) )  =
-      (varOfSent ( paraForm (Suc n)) ) \\<union>
-      (varOfSent (forallSent (down  n ) paraForm) )\"
-      by (metis (hide_lams, no_types) add_0_right moreSent down.simps(1) down.simps(2) nat.exhaust varsOnCat)
-      then show \"?P (Suc n) \"
-      apply(-,cut_tac a1,simp )
-      by (metis (lifting) b1)
-  qed
-      
 
 
 lemma subByStatement1:
@@ -1257,10 +1295,6 @@ lemma subByStatement1:
   (is \"?P S\")
   sorry*)
 
-lemma downNIsNotEmpty:
-  \"\\<exists> j xs. down N= j#xs\" (is \"?P N\")
-  proof(induct_tac N,auto)
-qed   
 
 lemma ForallSentForm [simp]:
   shows a1:\" (statement2Assigns (forallSent (down N) 
@@ -1597,11 +1631,17 @@ by (metis assms valOfLemma2Aux varsOfSent1)
   shows \"( \\<forall>i. (v \\<notin>  (varOfSent (ps i))) ) \\<Longrightarrow>  expEval ( valOf (statement2Assigns  (forallSent (down N) ps)) v) s=s  v\"
 by auto
 
-lemma valOfLemma7Aux [simp,intro]:\"v \\<notin> varOfSent S \\<longrightarrow>( valOf (statement2Assigns  (cat S S')) v) =    ( valOf (statement2Assigns S')) v\"
+lemma valOfLemma7Aux:\"v \\<notin> varOfSent S \\<longrightarrow>( valOf (statement2Assigns  (cat S S')) v) =    ( valOf (statement2Assigns S')) v\"
 proof(induct_tac S,auto)qed
 
 lemma valOfLemma7 [simp,intro]:\"v \\<notin> varOfSent S \\<Longrightarrow>( valOf (statement2Assigns  (cat S S')) v) =    ( valOf (statement2Assigns S')) v\"
 by(metis valOfLemma7Aux)
+
+lemma valOfLemma8Aux:\"v \\<in> varOfSent S \\<longrightarrow>( valOf (statement2Assigns  (cat S S')) v) =    ( valOf (statement2Assigns S)) v\"
+proof(induct_tac S,auto)qed
+
+lemma valOfLemma8A[simp,intro]:\"v \\<in> varOfSent S \\<Longrightarrow>( valOf (statement2Assigns  (cat S S')) v) =    ( valOf (statement2Assigns S)) v\"
+by(metis valOfLemma8Aux)
 
 thm noEffect
 lemma  noEffectOnRule[simp,intro]:
