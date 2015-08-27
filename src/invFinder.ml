@@ -683,6 +683,10 @@ let deal_with_case_3 crule cinv cons g =
       Prt.error (sprintf "\n\n%s, %s\nguard: %s\n%s\n" n params_str guard_str inv_str);
       raise Empty_exception
   in
+  let ConcreteProp(Prop(_, _, f), _) = causal_cinv in
+  if f = chaos then
+    [], deal_with_case_1 crule cinv g
+  else
   (new_inv, { rule = crule;
     inv = cinv;
     branch = g;
