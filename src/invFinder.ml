@@ -896,8 +896,10 @@ let check_invs_on_init cinvs init =
 let result_to_str (cinvs, relations) =
   let invs_str =
     cinvs
-    |> List.map ~f:concrete_prop_2_form
-    |> List.map ~f:ToStr.Smv.form_act
+    |> List.map ~f:(fun cinv ->
+      let ConcreteProp(Prop(name, _, _), _) = cinv in
+      name^": "^ToStr.Smv.form_act (concrete_prop_2_form cinv)
+    )
   in
   let relations_str = List.map relations ~f:to_str in
   String.concat ~sep:"\n" (relations_str@invs_str)

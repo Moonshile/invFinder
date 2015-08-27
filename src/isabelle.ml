@@ -436,64 +436,89 @@ end
 
 
 
-let gen_case_1 =
-"    have \"?P1 s\"
-    proof(cut_tac a1 a2 b1 c1, auto) qed
-    then have \"invHoldForRule' s f r (invariants N)\" by auto"
+let gen_case_1 indent conditions =
+  sprintf
+"  %shave \"?P1 s\"
+  %sproof(cut_tac a1 a2 b1 %s, auto) qed
+  %sthen have \"invHoldForRule' s f r (invariants N)\" by auto" indent indent conditions indent
 
-let gen_case_2 =
-"    have \"?P2 s\"
-    proof(cut_tac a1 a2 b1 c1, auto) qed
-    then have \"invHoldForRule' s f r (invariants N)\" by auto"
+let gen_case_2 indent conditions =
+  sprintf
+"  %shave \"?P2 s\"
+  %sproof(cut_tac a1 a2 b1 %s, auto) qed
+  %sthen have \"invHoldForRule' s f r (invariants N)\" by auto" indent indent conditions indent
 
-let gen_case_3 (ConcreteProp(Prop(_, _, f), _)) =
+let gen_case_3 indent conditions (ConcreteProp(Prop(_, _, f), _)) =
   let f = paramecium_form_to_loach f in
   sprintf
-"    have \"?P3 s\"
-    apply (cut_tac a1 a2 b1 c1, simp, rule_tac x=\"%s\" in exI, auto) done
-    then have \"invHoldForRule' s f r (invariants N)\" by auto" (formula_act (neg f))
+"  %shave \"?P3 s\"
+  %sapply (cut_tac a1 a2 b1 %s, simp, rule_tac x=\"%s\" in exI, auto) done
+  %sthen have \"invHoldForRule' s f r (invariants N)\" by auto"
+    indent indent conditions (formula_act (neg f)) indent
 
 let gen_branch branch case =
   sprintf "  moreover {\n    assume c1: \"%s\"\n%s\n  }" branch case
 
 let gen_inst relations condition =
-  let analyze_branch {rule; inv; branch; relation} =
-    let ConcreteProp(Prop(_, _, g), pfs) = branch in
-    let ConcreteRule(_, pfs_rule) = rule in
-    let ConcreteProp(_, pfs_prop) = inv in
-    let pfs_current = pfs_rule@pfs_prop in
-    let branch_constraint =
-      let overflow = List.filter pfs ~f:(fun (Paramfix(_, tn, c)) ->
-        not (List.exists pfs_current ~f:(fun (Paramfix(_, tn', c')) -> tn = tn' && c = c'))
-      ) in
-      let param_rels = String.concat ~sep:"\\<and>" (List.map overflow ~f:(fun (Paramfix(vn, _, _)) ->
-        String.concat ~sep:"\\<and>" (List.map pfs_current ~f:(fun (Paramfix(vn', _, _)) ->
-          sprintf "%s~=%s" vn vn'
-        ))
-      )) in
-      match overflow with
-      | [] -> ""
-      | _ -> sprintf "\\<exists> %s. %s\\<and>" (get_pf_name_list overflow) param_rels
+  (* if has many branches *)
+  if List.length relations > 1 then
+    let analyze_branch {rule; inv; branch; relation} =
+      let ConcreteProp(Prop(_, _, g), pfs) = branch in
+      let ConcreteRule(_, pfs_rule) = rule in
+      let ConcreteProp(_, pfs_prop) = inv in
+      let pfs_current = pfs_rule@pfs_prop in
+      let branch_constraint =
+        let overflow = List.filter pfs ~f:(fun (Paramfix(_, tn, c)) ->
+          not (List.exists pfs_current ~f:(fun (Paramfix(_, tn', c')) -> tn = tn' && c = c'))
+        ) in
+        let param_rels = String.concat ~sep:"\\<and>" (List.map overflow ~f:(fun (Paramfix(vn, _, _)) ->
+          String.concat ~sep:"\\<and>" (List.map pfs_current ~f:(fun (Paramfix(vn', _, _)) ->
+            sprintf "%s~=%s" vn vn'
+          ))
+        )) in
+        match overflow with
+        | [] -> ""
+        | _ -> sprintf "\\<exists> %s. %s\\<and>" (get_pf_name_list overflow) param_rels
+      in
+      let branch_str =
+        sprintf "(%s(formEval %s s))" branch_constraint (formula_act (paramecium_form_to_loach g))
+      in
+      let case_str =
+        match relation with
+        | InvHoldForRule1 -> gen_case_1 "  " "c1"
+        | InvHoldForRule2 -> gen_case_2 "  " "c1"
+        | InvHoldForRule3(cp) -> gen_case_3 "  " "c1" cp
+      in
+      branch_str, gen_branch branch_str case_str
     in
-    let branch_str =
-      sprintf "(%s(formEval %s s))" branch_constraint (formula_act (paramecium_form_to_loach g))
-    in
-    let case_str =
-      match relation with
-      | InvHoldForRule1 -> gen_case_1
-      | InvHoldForRule2 -> gen_case_2
-      | InvHoldForRule3(cp) -> gen_case_3 cp
-    in
-    branch_str, gen_branch branch_str case_str
-  in
-  let branches, moreovers = List.unzip (List.map relations ~f:analyze_branch) in
-  sprintf 
+    let branches, moreovers = List.unzip (List.map relations ~f:analyze_branch) in
+      sprintf
 "moreover {
   assume b1: \"%s\"
   have \"%s\" by auto
 %s
   ultimately have \"invHoldForRule' s f r (invariants N)\" by auto
-}" condition (String.concat ~sep:"\\<or>" branches) (String.concat ~sep:"\n" moreovers)
+}"
+        condition
+        (String.concat ~sep:"\\<or>" branches)
+        (String.concat ~sep:"\n" moreovers)
+  else begin
+    (* if there is only one TRUE branch *)
+    let [{rule=_; inv=_; branch=_; relation}] = relations in
+    let case_str =
+      match relation with
+      | InvHoldForRule1 -> gen_case_1 "" ""
+      | InvHoldForRule2 -> gen_case_2 "" ""
+      | InvHoldForRule3(cp) -> gen_case_3 "" "" cp
+    in
+    sprintf
+"moreover {
+  assume b1: \"%s\"
+%s
+}"
+        condition
+        case_str
+  end
 
 let analyze_lemma rels pfs_prop =
   let pfs =
