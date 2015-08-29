@@ -837,21 +837,38 @@ end
 " name name lemma_of_invs (gen_main rules invs) in
   Out_channel.write_all (sprintf "%s/%s.thy" name name) main_str;;
 
-let file_root name () =
-  let root_str = sprintf
-"session main_Session = HOL +
+let file_root name n () =
+  let ss_str ss_name ss_parent ss_theories = sprintf
+"session %s_Session = %s +
     theories
         %s
-" name in
+" ss_name ss_parent ss_theories
+  in
+  let ss_paraTheory = ss_str "paraTheory" "HOL" "paraTheory" in
+  let base_name = sprintf "%s_base" name in
+  let ss_base = ss_str base_name "paraTheory_Session" (base_name) in
+  let ss_lemmas =
+    let lemmas = List.map (up_to n) ~f:(fun i -> sprintf "lemma_on_inv__%d" (i + 1)) in
+    let lemmas_session = String.concat ~sep:"\n        " lemmas in
+    ss_str (sprintf "%s_lemma_on_inv" name) (base_name^"_Session") lemmas_session
+  in
+  let ss_main = ss_str name (sprintf "%s_lemma_on_inv_Session" name) name in
+  let root_str = ss_paraTheory^ss_base^ss_lemmas^ss_main in
   Out_channel.write_all (sprintf "%s/ROOT" name) root_str;;
 
-let file_sh name () =
-  let sh_str = 
+let file_sh name n () =
+  let gen_cmd ss_name = sprintf "isabelle build -v -d . -b %s" ss_name in
+  let cmd_paraTheory = gen_cmd "paraTheory_Session" in
+  let cmd_base = gen_cmd (sprintf "%s_base_Session" name) in
+  let cmd_lemmas = gen_cmd (sprintf "%s_lemma_on_inv_Session" name) in
+  let cmd_main = gen_cmd (sprintf "%s_Session" name) in
+  let sh_str = sprintf
 "#!/bin/bash
 shopt -s expand_aliases
 source ~/.bashrc
-isabelle build -v -d . -b main_Session
-" in
+%s
+" (String.concat ~sep:"\n" ([cmd_paraTheory; cmd_base; cmd_lemmas; cmd_main]))
+  in
   let filename = sprintf "%s/run.sh" name in
   Out_channel.write_all filename sh_str;
   Unix.chmod filename ~perm:0O777;;
@@ -877,6 +894,6 @@ let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varn
   file_inv name relations rules ();
   file_init name invs ();
   file_main name rules invs ();
-  file_root name ();
-  file_sh name ();;
+  file_root name (List.length invs) ();
+  file_sh name (List.length invs) ();;
 
