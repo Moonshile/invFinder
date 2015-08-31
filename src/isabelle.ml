@@ -645,76 +645,88 @@ using a1 a2 by auto"
 
 
 
-let analyze_rules_invs rules invs =
-  let inv_param_constraints =
-    List.map invs ~f:(fun (Paramecium.Prop(name, pds, _)) ->
-      if List.is_empty pds then
-        sprintf "(%s)" (analyze_rels_in_pds "f" name pds)
-      else
-        sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds)
-    )
-    |> String.concat ~sep:" \\<or>\n      "
-  in
-  let analyze_rule_invs (Rule(rname, pds, _, _)) =
-    let analyze_rule_inv (Paramecium.Prop(pname, pds, _)) =
-      let constraints =
-        if List.is_empty pds then
-          sprintf "(%s)" (analyze_rels_in_pds "f" pname pds)
-        else
-          sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" pname pds)
-      in
-      sprintf
-"    moreover {
-      assume f1: \"%s\"
-      have \"invHoldForRule' s f r (invariants N)\"
-      apply (cut_tac b1 b2 d1 f1, metis %sVs%s) done
-    }"
-        constraints
-        rname pname
-    in
-    let rule_quant = Hashtbl.find_exn rule_quant_table rname in
+
+
+let gen_lemma_inv_on_rules (Paramecium.Prop(pn, p_pds, _)) rules =
+  let prop_constraint = pds_param_constraints "f" pn p_pds in
+  let gen_lemma_inv_on_rule (Rule(rn, r_pds, _, _)) =
     let rule_constraint =
-      if List.is_empty pds then
-        analyze_rels_in_pds ~quant:rule_quant "r" rname pds
-      else
-        sprintf "\\<exists> %s. %s"
-          (get_pd_name_list pds)
-          (analyze_rels_in_pds ~quant:rule_quant "r" rname pds)
+      pds_param_constraints ~quant:(Hashtbl.find_exn rule_quant_table rn) "r" rn r_pds
     in
+    rule_constraint,
     sprintf
 "  moreover {
     assume d1: \"%s\"
-    have e1: \"%s\"
-    apply (cut_tac b1, auto) done
+    have \"invHoldForRule' s f r (invariants N)\"
+    apply (cut_tac b2 d1, metis %sVs%s) done
+  }
+" rule_constraint rn pn
+  in
+  let rule_constraints, moreovers = List.unzip (List.map rules ~f:gen_lemma_inv_on_rule) in
+  sprintf
+"lemma lemma_%s_on_rules:
+  assumes b1: \"r \\<in> rules N\" and b2: \"%s\"
+  shows \"invHoldForRule' s f r (invariants N)\"
+  proof -
+  have c1: \"%s\"
+  apply (cut_tac b1, auto) done
 %s
-    ultimately have \"invHoldForRule' s f r (invariants N)\"
-    apply fastforce done
-  }"
-      rule_constraint
-      inv_param_constraints
-      (String.concat ~sep:"\n" (List.map invs ~f:(analyze_rule_inv)))
-  in
-  String.concat ~sep:"\n" (List.map rules ~f:(analyze_rule_invs))
+  ultimately show \"invHoldForRule' s f r (invariants N)\"
+  apply fastforce done
+qed
+"
+    pn
+    prop_constraint
+    (String.concat ~sep:"\\<or>\n" rule_constraints)
+    (String.concat ~sep:"\n" moreovers)
 
-let gen_main rules invs =
-  let rule_param_constraints =
-    List.map rules ~f:(fun (Rule(name, pds, _, _)) ->
-      if List.is_empty pds then
-        sprintf "(%s)"
-          (analyze_rels_in_pds ~quant:(Hashtbl.find_exn rule_quant_table name) "r" name pds)
-      else
-        sprintf "(\\<exists> %s. %s)"
-          (get_pd_name_list pds)
-          (analyze_rels_in_pds ~quant:(Hashtbl.find_exn rule_quant_table name) "r" name pds)
-    )
-    |> String.concat ~sep:" \\<or>\n    "
+
+
+
+
+
+
+let gen_lemma_invs_on_rules invs =
+  let inv_on_rules inv =
+    let Paramecium.Prop(pn, p_pds, _) = inv in
+    let prop_constraint = pds_param_constraints "f" pn p_pds in
+    prop_constraint,
+    sprintf
+"  moreover {
+    assume c1: \"%s\"
+    have \"invHoldForRule' s f r (invariants N)\"
+    apply (cut_tac a2 c1, metis lemma_%s_on_rules) done
+  }
+" prop_constraint pn
   in
+  let prop_constraints, moreovers = List.unzip (List.map invs ~f:(inv_on_rules)) in
+  sprintf
+"lemma invs_on_rules:
+  assumes a1: \"f \\<in> invariants N\" and a2: \"r \\<in> rules N\"
+  shows \"invHoldForRule' s f r (invariants N)\"
+  proof -
+  have b1: \"%s\"
+  apply (cut_tac a1, auto) done
+%s
+  ultimately show \"invHoldForRule' s f r (invariants N)\"
+  apply fastforce done
+qed
+"
+    (String.concat ~sep:"\\<or>\n" prop_constraints)
+    (String.concat ~sep:"\n" moreovers)
+
+
+
+
+
+
+
+
+
+let gen_main invs =
   let inv_param_constraints =
     List.map invs ~f:(fun (Paramecium.Prop(name, pds, _)) ->
-      if List.is_empty pds then
-        sprintf "(%s)" (analyze_rels_in_pds "f" name pds)
-      else
-        sprintf "(\\<exists> %s. %s)" (get_pd_name_list pds) (analyze_rels_in_pds "f" name pds)
+      pds_param_constraints "f" name pds
     )
     |> String.concat ~sep:" \\<or>\n      "
   in
@@ -760,10 +772,8 @@ invHoldForRule' s f r (invariants N)\"
 proof ((rule allI)+, (rule impI)+)
   fix f r s
   assume b1: \"f \\<in> invariants N\" and b2: \"r \\<in> rules N\"
-  have c1: \"%s\"
-  apply (cut_tac b2, auto) done
-  %s
-  ultimately show \"invHoldForRule' s f r (invariants N)\" apply fastforce done
+  show \"invHoldForRule' s f r (invariants N)\"
+  apply (rule invs_on_rules, cut_tac b1, assumption, cut_tac b2, assumption) done
 qed
 qed
 next show \"s \\<in> reachableSet {andList (allInitSpecs N)} (rules N)\"
@@ -771,8 +781,6 @@ next show \"s \\<in> reachableSet {andList (allInitSpecs N)} (rules N)\"
 qed"
   inv_param_constraints
   (String.concat ~sep:"\n" (List.map invs ~f:analyze_inv_on_ini))
-  rule_param_constraints
-  (analyze_rules_invs rules invs)
 
 
 
@@ -815,6 +823,35 @@ end
   in
   wrapper relations;;
 
+let file_inv_on_rules name invs rules () =
+  let rec wrapper invs =
+    match invs with
+    | [] -> ()
+    | inv::invs' ->
+      let Paramecium.Prop(pn, _, _) = inv in
+      let lemma_str = sprintf
+"theory lemma_%s_on_rules imports lemma_on_%s
+begin
+%s
+end
+"  pn pn (gen_lemma_inv_on_rules inv rules) in
+      Out_channel.write_all (sprintf "%s/lemma_%s_on_rules.thy" name pn) lemma_str;
+      wrapper invs'
+  in
+  wrapper invs;;
+
+let file_invs_on_rules name invs () =
+  let imports = List.map invs ~f:(fun (Paramecium.Prop(pn, _, _)) ->
+    sprintf "lemma_%s_on_rules" pn
+  ) in
+  let lemma_str = sprintf
+"theory lemma_invs_on_rules imports %s
+begin
+%s
+end
+" (String.concat ~sep:" " imports) (gen_lemma_invs_on_rules invs) in
+  Out_channel.write_all (sprintf "%s/lemma_invs_on_rules.thy" name) lemma_str;;
+
 let file_init name invs () =
   let init_str = sprintf
 "theory on_ini imports %s_base
@@ -824,17 +861,14 @@ end
 " name (gen_lemma_invs_on_ini invs) in
   Out_channel.write_all (sprintf "%s/on_ini.thy" name) init_str;;
 
-let file_main name rules invs () =
+let file_main name invs () =
   let indice = List.map (up_to (List.length invs)) ~f:(fun x -> x + 1) in
-  let lemma_of_invs = String.concat ~sep:" " (List.map indice ~f:(fun i -> 
-    sprintf "lemma_on_inv__%d" i
-  )) in
   let main_str = sprintf
-"theory %s imports %s_base %s on_ini
+"theory %s imports %s_base lemma_invs_on_rules on_ini
 begin
 %s
 end
-" name name lemma_of_invs (gen_main rules invs) in
+" name name (gen_main invs) in
   Out_channel.write_all (sprintf "%s/%s.thy" name name) main_str;;
 
 let file_root name n () =
@@ -842,32 +876,56 @@ let file_root name n () =
 "session %s_Session = %s +
     theories
         %s
-" ss_name ss_parent ss_theories
+" ss_name ss_parent (String.concat ~sep:"\n        " ss_theories)
   in
-  let ss_paraTheory = ss_str "paraTheory" "HOL" "paraTheory" in
+  let ss_paraTheory = ss_str "paraTheory" "HOL" ["paraTheory"] in
   let base_name = sprintf "%s_base" name in
-  let ss_base = ss_str base_name "paraTheory_Session" (base_name) in
-  let ss_lemmas =
-    let lemmas = List.map (up_to n) ~f:(fun i -> sprintf "lemma_on_inv__%d" (i + 1)) in
-    let lemmas_session = String.concat ~sep:"\n        " lemmas in
-    ss_str (sprintf "%s_lemma_on_inv" name) (base_name^"_Session") lemmas_session
+  let lemma_ss_name i = sprintf "%s_lemma_on_inv__%d" name i in
+  let lemma_name i = sprintf "lemma_on_inv__%d" i in
+  let lemma_on_rules_name i = sprintf "lemma_inv__%d_on_rules" i in
+  let ss_base = ss_str base_name "paraTheory_Session" [base_name] in
+  let ss_lemma1 =
+    ss_str (lemma_ss_name 1) (base_name^"_Session") [lemma_name 1; lemma_on_rules_name 1]
   in
-  let ss_main = ss_str name (sprintf "%s_lemma_on_inv_Session" name) name in
-  let root_str = ss_paraTheory^ss_base^ss_lemmas^ss_main in
+  let ss_lemmas =
+    List.map (up_to (n - 1)) ~f:(fun i ->
+      ss_str (lemma_ss_name (i + 2)) (lemma_ss_name (i + 1)^"_Session")
+        [lemma_name (i + 2); lemma_on_rules_name (i + 2)]
+    )
+  in
+  let lemma_invs_on_rules_name = sprintf "%s_lemma_invs_on_rules" name in 
+  let ss_invs_on_rules =
+    ss_str lemma_invs_on_rules_name (lemma_ss_name n^"_Session") ["lemma_invs_on_rules"]
+  in
+  let ss_main = ss_str name (lemma_invs_on_rules_name^"_Session") [name] in
+  let root_str =
+    String.concat ~sep:"\n" (
+      [ss_paraTheory; ss_base; ss_lemma1]@
+      ss_lemmas@
+      [ss_invs_on_rules; ss_main]
+    )
+  in
   Out_channel.write_all (sprintf "%s/ROOT" name) root_str;;
 
 let file_sh name n () =
   let gen_cmd ss_name = sprintf "isabelle build -v -d . -b %s" ss_name in
   let cmd_paraTheory = gen_cmd "paraTheory_Session" in
   let cmd_base = gen_cmd (sprintf "%s_base_Session" name) in
-  let cmd_lemmas = gen_cmd (sprintf "%s_lemma_on_inv_Session" name) in
+  let cmd_lemmas = List.map (up_to n) ~f:(fun i ->
+    gen_cmd (sprintf "%s_lemma_on_inv__%d_Session" name (i + 1))
+  ) in
+  let cmd_invs_on_rules = gen_cmd (sprintf "%s_lemma_invs_on_rules_Session" name) in
   let cmd_main = gen_cmd (sprintf "%s_Session" name) in
   let sh_str = sprintf
 "#!/bin/bash
 shopt -s expand_aliases
 source ~/.bashrc
 %s
-" (String.concat ~sep:"\n" ([cmd_paraTheory; cmd_base; cmd_lemmas; cmd_main]))
+" (String.concat ~sep:"\n" (
+    [cmd_paraTheory; cmd_base]@
+    cmd_lemmas@
+    [cmd_invs_on_rules; cmd_main]
+  ))
   in
   let filename = sprintf "%s/run.sh" name in
   Out_channel.write_all filename sh_str;
@@ -892,8 +950,10 @@ let protocol_act {name; types; vardefs; init; rules; properties} cinvs_with_varn
   let inits_str = inits_act init in
   file_pub name types_str rules_str invs_str inits_str ();
   file_inv name relations rules ();
+  file_inv_on_rules name invs rules ();
+  file_invs_on_rules name invs ();
   file_init name invs ();
-  file_main name rules invs ();
+  file_main name invs ();
   file_root name (List.length invs) ();
   file_sh name (List.length invs) ();;
 
