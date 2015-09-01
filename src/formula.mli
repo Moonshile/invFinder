@@ -35,7 +35,7 @@ val flat_or_to_list : formula -> formula list
 val flat_to_orList : formula -> formula
 
 (** Simplify a formula *)
-val simplify : formula -> formula
+val simplify : ?eli_eqn:bool -> formula -> formula
 
 (** Raises when there are many parameter references more than range of its type *)
 exception Too_many_parameters_of_same_type

@@ -23,21 +23,27 @@ let is_tautology ?(quiet=true) form =
 let is_satisfiable ?(quiet=true) form =
   Smt.is_satisfiable ~quiet (ToStr.Smt2.form_of form)
 
-let rec eliminate_imply_neg form =
+let rec eliminate_imply_neg ?(eli_eqn=false)  form =
   match form with
   | Chaos
   | Miracle
   | Eqn(_) -> form
   | Neg(Chaos) -> miracle
   | Neg(Miracle) -> chaos
+  | Neg(Eqn(Const(Boolc(true)), e1))
+  | Neg(Eqn(e1, Const(Boolc(true)))) ->
+    if eli_eqn then eqn e1 (Const(Boolc(false))) else begin form end
+  | Neg(Eqn(Const(Boolc(false)), e1))
+  | Neg(Eqn(e1, Const(Boolc(false)))) ->
+    if eli_eqn then eqn e1 (Const(Boolc(true))) else begin form end
   | Neg(Eqn(_)) -> form
-  | Neg(Neg(f)) -> eliminate_imply_neg f
-  | Neg(AndList(fl)) -> eliminate_imply_neg (orList (List.map fl ~f:neg))
-  | Neg(OrList(fl)) -> eliminate_imply_neg (andList (List.map fl ~f:neg))
-  | Neg(Imply(f1, f2)) -> eliminate_imply_neg (andList [f1; neg f2])
-  | AndList(fl) -> andList (List.map fl ~f:eliminate_imply_neg)
-  | OrList(fl) -> orList (List.map fl ~f:eliminate_imply_neg)
-  | Imply(f1, f2) -> eliminate_imply_neg (orList [neg f1; f2])
+  | Neg(Neg(f)) -> eliminate_imply_neg ~eli_eqn f
+  | Neg(AndList(fl)) -> eliminate_imply_neg ~eli_eqn (orList (List.map fl ~f:neg))
+  | Neg(OrList(fl)) -> eliminate_imply_neg ~eli_eqn (andList (List.map fl ~f:neg))
+  | Neg(Imply(f1, f2)) -> eliminate_imply_neg ~eli_eqn (andList [f1; neg f2])
+  | AndList(fl) -> andList (List.map fl ~f:(eliminate_imply_neg ~eli_eqn))
+  | OrList(fl) -> orList (List.map fl ~f:(eliminate_imply_neg ~eli_eqn))
+  | Imply(f1, f2) -> eliminate_imply_neg ~eli_eqn (orList [neg f1; f2])
 
 (** Cast a formula to a list of formulae with and relation between them *)
 let flat_and_to_list form =
@@ -134,8 +140,8 @@ and dedup form =
   | Imply(f1, f2) -> imply (dedup f1) (dedup f2)
 
 (** Simplify a formula *)
-let simplify form =
-  let no_imply_neg = eliminate_imply_neg form in
+let simplify ?(eli_eqn=false) form =
+  let no_imply_neg = eliminate_imply_neg ~eli_eqn form in
   let rec wrapper form =
     match form with
     | Chaos -> chaos

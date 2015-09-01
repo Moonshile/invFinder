@@ -403,7 +403,7 @@ module Choose = struct
 
   (* Check the level of an optional invariant *)
   let check_level ?(must_new=false) inv =
-    let inv = simplify inv in
+    let inv = simplify ~eli_eqn:true inv in
     if is_tautology (neg inv) then
       tautology inv
     else begin
@@ -849,6 +849,7 @@ let get_res_of_cinv cinv rname_paraminfo_pairs =
   let cinvs = InvLib.add_many new_invs in
   cinvs, fix_relations_with_cinvs cinvs new_relations@relations_of_hold2
 
+
 let read_res_cache cinvs =
   let cinvs' = Storage.get (!protocol_name) "cinvs" cinvs (List.t_of_sexp concrete_prop_of_sexp) in
   let inv_cinv_pairs =
@@ -873,6 +874,53 @@ let write_res_cache cinvs new_relations =
   Storage.replace (!protocol_name) "invlib" tuple2s invlib_convertor;
   Storage.add_many (!protocol_name) "relations" new_relations rel_convertor;;
 
+(* This function has problems and is discarded *)
+let upgrade_res_cache () =
+  let rec eliminate_eqn_TF form =
+    match form with
+    | Neg(Eqn(Const(Boolc(true)), e1))
+    | Neg(Eqn(e1, Const(Boolc(true)))) -> eqn e1 (Const(Boolc(false)))
+    | Neg(Eqn(Const(Boolc(false)), e1))
+    | Neg(Eqn(e1, Const(Boolc(false)))) -> eqn e1 (Const(Boolc(true)))
+    | _ -> form
+  in
+  let cinvs = InvLib.get_all_cinvs () in
+  let _, relations = read_res_cache [] in
+  let cinvs' = List.map cinvs ~f:(fun cinv ->
+    let ConcreteProp(Prop(pn, pds, f), pfs) = cinv in
+    let cinv' = concrete_prop (prop pn pds (eliminate_eqn_TF f)) pfs in
+    if not (cinv = cinv') then
+      Prt.warning (ToStr.Smv.form_act (concrete_prop_2_form cinv'))
+    else ();
+    Tuple2.create (concrete_prop_2_form cinv') cinv'
+  ) in
+  let relations' = List.map relations ~f:(fun rels ->
+    List.map rels ~f:(fun rs ->
+      List.map rs ~f:(fun rlist ->
+        List.map rlist ~f:(fun rel ->
+          let {rule; inv; branch; relation} = rel in
+          let ConcreteProp(Prop(pn, p_pds, p_form), p_pfs) = inv in
+          let inv' = concrete_prop (prop pn p_pds (eliminate_eqn_TF p_form)) p_pfs in
+          let ConcreteProp(Prop(bn, b_pds, b_form), b_pfs) = branch in
+          let branch' = concrete_prop (prop bn b_pds (eliminate_eqn_TF b_form)) b_pfs in
+          let relation' =
+            match relation with
+            | InvHoldForRule1
+            | InvHoldForRule2 -> relation
+            | InvHoldForRule3(ConcreteProp(Prop(cn, c_pds, c_form), c_pfs)) ->
+              invHoldForRule3 (concrete_prop (prop cn c_pds (eliminate_eqn_TF c_form)) c_pfs)
+          in
+          {rule; inv=inv'; branch=branch'; relation=relation'}
+        )
+      )
+    )
+  ) in
+  let invlib_convertor = List.sexp_of_t (Tuple2.sexp_of_t sexp_of_formula sexp_of_concrete_prop) in
+  let rel_convertor = List.sexp_of_t (List.sexp_of_t (List.sexp_of_t sexp_of_t)) in
+  Storage.replace (!protocol_name) "invlib" cinvs' invlib_convertor;
+  Storage.replace_many (!protocol_name) "relations" relations' rel_convertor;;
+
+
 (* Find new inv and relations with concrete rules and a concrete invariant *)
 let tabular_rules_cinvs rname_paraminfo_pairs cinvs relations =
   let rec wrapper cinvs relations =
@@ -893,9 +941,9 @@ let simplify_prop property =
   let orList_items =
     if List.length pds > 0 then
       let ps = cart_product_with_paramfix pds (!type_defs) in
-      List.map ps ~f:(fun p -> simplify (neg (apply_form f ~p)))
+      List.map ps ~f:(fun p -> simplify ~eli_eqn:true (neg (apply_form f ~p)))
     else begin
-      [simplify (neg f)]
+      [simplify ~eli_eqn:true (neg f)]
     end
   in
   orList_items
@@ -943,7 +991,8 @@ let result_to_str (cinvs, relations) =
     @param prop_params property parameters given
     @return causal relation table
 *)
-let find ?(smv_escape=(fun inv_str -> inv_str)) ?(smv="") ?(smv_bmc="") ?(murphi="") protocol =
+let find ?(smv_escape=(fun inv_str -> inv_str))
+    ?(smv="") ?(smv_bmc="") ?(murphi="") protocol =
   let {name; types; vardefs; init; rules; properties} = Loach.Trans.act ~loach:protocol in
   let _smt_context = Smt.set_context name (ToStr.Smt2.context_of ~types ~vardefs) in
   let _mu_context = Murphi.set_context name murphi in
