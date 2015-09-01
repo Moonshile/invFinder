@@ -748,7 +748,7 @@ and b3: \"formEval ini s\"
   apply (cut_tac b1, simp) done
 %s
   ultimately show \"formEval f s\"
-  by auto
+  apply fastforce done
 qed
 " (String.concat ~sep:"\\<or>\n    " prop_constraints) (String.concat ~sep:"\n" moreovers)
 

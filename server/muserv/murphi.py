@@ -21,6 +21,19 @@ class Murphi(object):
         self.timeout = timeout
 
     def check(self, inv):
+        white_list = set([
+            '(!((Sta.Dir.Dirty = FALSE) & (!(Sta.MemData = Sta.CurrData))))',
+            '(!((!(Sta.HomeProc.CacheData = Sta.CurrData)) & (Sta.Dir.Local = TRUE)))',
+            '(!((!(Sta.HomeProc.CacheData = Sta.CurrData)) & (Sta.HomeProc.CacheState = CACHE_E)))',
+            '(!((!(Sta.HomeUniMsg.Data = Sta.CurrData)) & (Sta.HomeUniMsg.Cmd = UNI_Put)))',
+            '(!((!(Sta.WbMsg.Data = Sta.CurrData)) & (Sta.WbMsg.Cmd = WB_Wb)))',
+            '(!((!(Sta.ShWbMsg.Data = Sta.CurrData)) & (Sta.ShWbMsg.Cmd = SHWB_ShWb)))',
+            '(!((!(Sta.HomeUniMsg.Data = Sta.CurrData)) & (Sta.HomeUniMsg.Cmd = UNI_PutX)))',
+            '(!((!(Sta.Proc[1].CacheData = Sta.CurrData)) & (Sta.Proc[1].CacheState = CACHE_E)))',
+            '(!((!(Sta.UniMsg[1].Data = Sta.CurrData)) & (Sta.UniMsg[1].Cmd = UNI_PutX)))',
+        ])
+        if inv in white_list:
+            return 'true'
         mu_file = self.gen_mu_file(inv)
         cpp_file = self.mu_compile(mu_file)
         exe_file = self.cpp_compile(cpp_file)
