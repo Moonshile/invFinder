@@ -6,10 +6,6 @@
 
 open Core.Std
 
-(*----------------------------- Switches ----------------------------------*)
-
-let debug_switch = ref false;
-
 (*----------------------------- Exceptions ----------------------------------*)
 
 (* This exception is for stop warnings. It will never be raised. *)

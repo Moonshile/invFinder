@@ -4,10 +4,6 @@
     @author Kaiqiang Duan <duankq@ios.ac.cn>
 *)
 
-(*----------------------------- Switches ----------------------------------*)
-
-val debug_switch : bool ref
-
 (*----------------------------- Exceptions ----------------------------------*)
 
 (* This exception is for stop warnings. It will never be raised. *)

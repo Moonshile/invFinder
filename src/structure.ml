@@ -4,9 +4,8 @@
     @author Kaiqiang Duan <duankq@ios.ac.cn>
 *)
 
-open Utils
-
 open Core.Std
+open Utils
 
 (*------------------------------ Types ---------------------------------*)
 
@@ -20,6 +19,13 @@ with sexp
 let intc i = Intc i
 let strc s = Strc s
 let boolc b = Boolc b
+
+(** Convert a int list to const list *)
+let int_consts ints = List.map ints ~f:intc
+(** Convert a string list to const list *)
+let str_consts strs = List.map strs ~f:strc
+(** Convert a boolean list to const list *)
+let bool_consts bools = List.map bools ~f:boolc
 
 (** Basic types available, including integers and enumerations.
     Types are defined by their names and range.
@@ -60,6 +66,13 @@ with sexp
 
 let arrdef ls typename = Arrdef(ls, typename)
 
+(** Record definition *)
+let record_def name paramdefs vardefs =
+  List.map vardefs ~f:(fun vardef ->
+    let Arrdef(ls, t) = vardef in
+    arrdef ((name, paramdefs)::ls) t
+  )
+
 (** Variable reference *)
 type var =
   | Arr of (string * paramref list) list
@@ -67,45 +80,62 @@ with sexp
 
 let arr ls = Arr(ls)
 
+(** Global variable *)
+let global name = arr [(name, [])]
+
+(** Record *)
+let record vars =
+  arr (List.concat (List.map vars ~f:(fun (Arr(ls)) -> ls)))
+
 (** Represents expressions, including
     + Constants
     + Variable references
     + Parameter
     + Ite exp
+    + UIPFun: Uninterpreted function, such as + - * /
 *)
 type exp =
   | Const of const
   | Var of var
   | Param of paramref
   | Ite of formula * exp * exp
+  | UIPFun of string * exp list
 (** Boolean expressions, including
     + Boolean constants, Chaos as True, Miracle as false
     + Equation expression
     + Other basic logical operations, including negation,
       conjuction, disjuction, and implication
+    + Uninterpreted predications, such as > >= < <=
 *)
 and formula =
   | Chaos
   | Miracle
   | Eqn of exp * exp
+  | UIPPred of string * exp list
   | Neg of formula
   | AndList of formula list
   | OrList of formula list
   | Imply of formula * formula
+  | ForallFormula of paramdef list * formula
+  | ExistFormula of paramdef list * formula
 with sexp
 
 let const c = Const c
 let var v = Var v
 let param paramref = Param(paramref)
 let ite f e1 e2 = Ite(f, e1, e2)
+let uipFun name args = UIPFun(name, args)
 
 let chaos = Chaos
 let miracle = Miracle
 let eqn e1 e2 = Eqn(e1, e2)
+let uipPred name args = UIPPred(name, args)
 let neg f = Neg f
 let andList fs = AndList fs
 let orList fs = OrList fs
 let imply f1 f2 = Imply(f1, f2)
+let forallFormula paramdefs form = ForallFormula(paramdefs, form)
+let existFormula paramdefs form = ExistFormula(paramdefs, form)
 
 (** Assignment statements, including
     + Single assignment
@@ -114,10 +144,16 @@ let imply f1 f2 = Imply(f1, f2)
 type statement =
   | Assign of var * exp
   | Parallel of statement list
+  | IfStatement of formula * statement
+  | IfelseStatement of formula * statement * statement
+  | ForStatement of statement * paramdef list
 with sexp
 
 let assign v e = Assign(v, e)
 let parallel statements = Parallel statements
+let ifStatement form statement = IfStatement(form, statement)
+let ifelseStatement form s1 s2 = IfelseStatement(form, s1, s2)
+let forStatement s paramdefs = ForStatement(s, paramdefs)
 
 (** Represents rules which consists of guard and assignments
     + Rule: name, parameters, guard, assignments
@@ -148,7 +184,11 @@ type protocol = {
 }
 with sexp
 
-(*----------------------------- Exceptions ----------------------------------*)
+
+
+
+
+
 
 (** The actual parameters can't match with their definitions *)
 exception Unmatched_parameters
@@ -158,14 +198,13 @@ exception Unmatched_parameters
 *)
 exception Unexhausted_inst
 
-(*----------------------------- Functions ----------------------------------*)
 
-(** Convert a int list to const list *)
-let int_consts ints = List.map ints ~f:intc
-(** Convert a string list to const list *)
-let str_consts strs = List.map strs ~f:strc
-(** Convert a boolean list to const list *)
-let bool_consts bools = List.map bools ~f:boolc
+
+
+
+
+
+
 
 (** Find the letues range of a type by its name
 *)
@@ -236,6 +275,11 @@ let find_paramdef pds name =
 
 
 
+
+
+
+
+
 (* attach const i to string name *)
 let attach name i =
   match i with
@@ -270,22 +314,30 @@ let rec apply_exp exp ~p =
   | Param(pr) -> param (apply_paramref pr ~p)
   | Const(_) -> exp
   | Ite(f, e1, e2) -> ite (apply_form f ~p) (apply_exp e1 ~p) (apply_exp e2 ~p)
+  | UIPFun(name, el) -> uipFun name (List.map el ~f:(apply_exp ~p))
 (** Apply formula with param *)
 and apply_form f ~p =
   match f with
   | Chaos
   | Miracle -> f
   | Eqn(e1, e2) -> eqn (apply_exp e1 ~p) (apply_exp e2 ~p)
+  | UIPPred(name, el) -> uipPred name (List.map el ~f:(apply_exp ~p))
   | Neg(form) -> neg (apply_form form ~p)
   | AndList(fl) -> andList (List.map fl ~f:(apply_form ~p))
   | OrList(fl) -> orList (List.map fl ~f:(apply_form ~p))
   | Imply(f1, f2) -> imply (apply_form f1 ~p) (apply_form f2 ~p)
+  | ForallFormula(pds, f) -> forallFormula pds (apply_form f ~p)
+  | ExistFormula(pds, f) -> existFormula pds (apply_form f ~p)
 
 (** Apply statement with param *)
 let rec apply_statement statement ~p =
   match statement with
   | Assign(v, e) -> assign (apply_array v ~p) (apply_exp e ~p)
   | Parallel(sl) -> parallel (List.map sl ~f:(apply_statement ~p))
+  | IfStatement(f, s) -> ifStatement (apply_form f ~p) (apply_statement s ~p)
+  | IfelseStatement(f, s1, s2) ->
+    ifelseStatement (apply_form f ~p) (apply_statement s1 ~p) (apply_statement s2 ~p)
+  | ForStatement(s, pd) -> raise Empty_exception
 
 (* Check if a given parameter matches with the paramdef *)
 let name_match params defs =
@@ -329,76 +381,17 @@ let apply_prop property ~p =
   else
     raise Unmatched_parameters
 
+let rule_to_insts r ~types =
+  let Rule(n, pd, f, s) = r in
+  let ps = cart_product_with_paramfix pd types in
+  if pd = [] then
+    [r]
+  else begin
+    List.map ps ~f:(fun p -> apply_rule r ~p)
+  end
 
 
 
-
-
-
-
-
-
-(*********************************** Module Variable Names **************************************)
-
-(** Get variable names in the components *)
-module VarNames = struct
-  
-  open String.Set
-
-  (** Names of var *)
-  let of_var v =
-    let Arr(ls) = v in
-    of_list [String.concat ~sep:"." (List.map ls ~f:(fun (n, _) -> n))]
-
-  (** Names of exp *)
-  let rec of_exp e =
-    match e with
-    | Const(_)
-    | Param(_) -> of_list []
-    | Var(v) -> of_var v
-    | Ite(f, e1, e2) -> union_list [of_form f; of_exp e1; of_exp e2]
-  (** Names of formula *)
-  and of_form f =
-    match f with
-    | Chaos
-    | Miracle -> of_list []
-    | Eqn(e1, e2) -> union_list [of_exp e1; of_exp e2]
-    | Neg(form) -> of_form form
-    | AndList(fl)
-    | OrList(fl) -> union_list (List.map fl ~f:of_form)
-    | Imply(f1, f2) -> union_list [of_form f1; of_form f2]
-
-
-  let rec of_statement s =
-    match s with
-    | Assign(v, e) -> union_list [of_var v; of_exp e]
-    | Parallel(slist) -> union_list (List.map slist ~f:of_statement)
-
-  let of_rule r = 
-    match r with
-    | Rule(_, _, f, s) -> union_list [of_form f; of_statement s]
-end
-
-
-
-
-
-module VarNamesOfAssigns = struct
-  
-  open String.Set
-  
-  include VarNames
-
-  let rec of_statement s =
-    match s with
-    | Assign(v, e) -> of_var v
-    | Parallel(slist) -> union_list (List.map slist ~f:of_statement)
-
-  let of_rule r =
-    match r with
-    | Rule(_, _, _, s) -> of_statement s
-
-end
 
 
 
@@ -417,24 +410,32 @@ module VarNamesWithParam = struct
     | Param(_) -> of_list []
     | Var(v) -> of_var v
     | Ite(f, e1, e2) -> union_list [of_form ~of_var f; of_exp ~of_var e1; of_exp ~of_var e2]
+    | UIPFun(_, el) -> union_list (List.map el ~f:(of_exp ~of_var))
   (** Names of formula *)
   and of_form ~of_var f =
     match f with
     | Chaos
     | Miracle -> of_list []
     | Eqn(e1, e2) -> union_list [of_exp ~of_var e1; of_exp ~of_var e2]
+    | UIPPred(_, el) -> union_list (List.map el ~f:(of_exp ~of_var))
     | Neg(form) -> of_form ~of_var form
     | AndList(fl)
     | OrList(fl) -> union_list (List.map fl ~f:(of_form ~of_var))
     | Imply(f1, f2) -> union_list [of_form ~of_var f1; of_form ~of_var f2]
+    | ForallFormula(_)
+    | ExistFormula(_) -> raise Empty_exception
 
 
   let rec of_statement ~of_var s =
     match s with
     | Assign(v, e) -> union_list [of_var v; of_exp ~of_var e]
     | Parallel(slist) -> union_list (List.map slist ~f:(of_statement ~of_var))
+    | ForStatement(_)
+    | IfStatement(_)
+    | IfelseStatement(_) -> raise Empty_exception
 
   let of_rule ~of_var r = 
     match r with
     | Rule(_, _, f, s) -> union_list [of_form ~of_var f; of_statement ~of_var s]
 end
+
