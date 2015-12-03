@@ -337,7 +337,7 @@ let rec apply_statement statement ~p =
   | IfStatement(f, s) -> ifStatement (apply_form f ~p) (apply_statement s ~p)
   | IfelseStatement(f, s1, s2) ->
     ifelseStatement (apply_form f ~p) (apply_statement s1 ~p) (apply_statement s2 ~p)
-  | ForStatement(s, pd) -> raise Empty_exception
+  | ForStatement(_) -> raise Empty_exception
 
 (* Check if a given parameter matches with the paramdef *)
 let name_match params defs =
@@ -382,13 +382,20 @@ let apply_prop property ~p =
     raise Unmatched_parameters
 
 let rule_to_insts r ~types =
-  let Rule(n, pd, f, s) = r in
-  let ps = cart_product_with_paramfix pd types in
-  if pd = [] then
+  let Rule(_, pds, _, _) = r in
+  let ps = cart_product_with_paramfix pds types in
+  if pds = [] then
     [r]
-  else begin
+  else
     List.map ps ~f:(fun p -> apply_rule r ~p)
-  end
+
+let prop_to_insts property ~types =
+  let Prop(_, pds, _) = property in
+  let ps = cart_product_with_paramfix pds types in
+  if pds = [] then
+    [property]
+  else
+    List.map ps ~f:(fun p -> apply_prop property ~p)
 
 
 
@@ -439,3 +446,144 @@ module VarNamesWithParam = struct
     | Rule(_, _, f, s) -> union_list [of_form ~of_var f; of_statement ~of_var s]
 end
 
+
+
+
+
+
+
+
+
+module Equal = struct
+
+  let in_paramref pr1 pr2 =
+    match (pr1, pr2) with
+    | (Paramref(n1), Paramref(n2)) -> n1 = n2
+    | (Paramfix(_, t1, c1), Paramfix(_, t2, c2)) -> t1 = t2 && c1 = c2
+    | _ -> false
+
+  let in_var v1 v2 =
+    let Arr(ls1) = v1 in
+    let Arr(ls2) = v2 in
+    match List.zip ls1 ls2 with
+    | None -> false
+    | Some(ls_pairs) ->
+      List.fold ls_pairs ~init:true ~f:(fun res ((n1, ps1), (n2, ps2)) ->
+        match List.zip ps1 ps2 with
+        | None -> false
+        | Some(p_pairs) ->
+          let pairs_res =
+            List.fold p_pairs ~init:true ~f:(fun res (p1, p2) -> res && in_paramref p1 p2)
+          in
+          res && n1 = n2 && pairs_res
+      )
+  
+end
+
+
+
+
+
+
+
+
+
+
+(* unwind all for statements *)
+let rec eliminate_for statement ~types =
+  match statement with
+  | Assign(_) -> statement
+  | Parallel(sl) -> parallel (List.map sl ~f:(eliminate_for ~types))
+  | IfStatement(f, s) -> ifStatement f (eliminate_for s ~types)
+  | IfelseStatement(f, s1, s2) ->
+    ifelseStatement f (eliminate_for s1 ~types) (eliminate_for s2 ~types)
+  | ForStatement(s, pd) ->
+    let pfs = cart_product_with_paramfix pd types in
+    parallel (List.map pfs ~f:(fun p -> apply_statement s ~p))
+
+(* eliminate if statements, must eliminate all for statements before *)
+let rec eliminate_ifelse_wrapper statement =
+  match statement with
+  | Assign(v, e) -> [(v, e)]
+  | Parallel(sl) -> List.concat (List.map sl ~f:eliminate_ifelse_wrapper)
+  | IfStatement(f, s) ->
+    let pairs = eliminate_ifelse_wrapper s in
+    List.map pairs ~f:(fun (v, e) -> (v, ite f e (var v)))
+  | IfelseStatement(f, s1, s2) ->
+    let pairs1 = eliminate_ifelse_wrapper s1 in
+    let pairs2 = eliminate_ifelse_wrapper s2 in
+    let res_part1 = List.map pairs1 ~f:(fun (v1, e1) ->
+      match List.find pairs2 ~f:(fun (v2, _) -> v1 = v2) with
+      | Some((v, e2)) -> (v, ite f e1 e2)
+      | None -> (v1, ite f e1 (var v1))
+    ) in
+    let res_part2 = List.filter_map pairs2 ~f:(fun (v2, e2) ->
+      match List.find pairs1 ~f:(fun (v1, _) -> v1 = v2) with
+      | Some(_) -> None
+      | None -> Some((v2, ite f (var v2) e2))
+    ) in
+    res_part1@res_part2
+  | ForStatement(_) -> raise Empty_exception
+
+let eliminate_ifelse statement =
+  let statement' = eliminate_ifelse_wrapper statement in
+  parallel (List.map statement' ~f:(fun (v, e) -> assign v e))
+
+
+
+
+
+
+(* process execution of exp *)
+let rec exec_exp e ~pairs =
+  match e with
+  | Const(_)
+  | Param(_) -> e
+  | Var(v) ->
+    begin
+      match List.find pairs ~f:(fun (v', _) -> Equal.in_var v v') with
+      | Some((_, e')) -> e'
+      | None -> e
+    end
+  | Ite(f, e1, e2) -> ite (exec_formula f ~pairs) (exec_exp e1 ~pairs) (exec_exp e2 ~pairs)
+  | UIPFun(n, el) -> uipFun n (List.map el ~f:(exec_exp ~pairs))
+and exec_formula form ~pairs =
+  match form with
+  | Chaos
+  | Miracle -> form
+  | Eqn(e1, e2) -> eqn (exec_exp e1 ~pairs) (exec_exp e2 ~pairs)
+  | UIPPred(n, el) -> uipPred n (List.map el ~f:(exec_exp ~pairs))
+  | Neg(f) -> neg (exec_formula f ~pairs)
+  | AndList(fl) -> andList (List.map fl ~f:(exec_formula ~pairs))
+  | OrList(fl) -> orList (List.map fl ~f:(exec_formula ~pairs))
+  | Imply(f1, f2) -> imply (exec_formula f1 ~pairs) (exec_formula f2 ~pairs)
+  | ForallFormula(pds, f) -> forallFormula pds (exec_formula f ~pairs)
+  | ExistFormula(pds, f) -> existFormula pds (exec_formula f ~pairs)
+
+(* process sequence execution of statements, must eliminate all for/if statements before *)
+let exec_sequence assign_pairs =
+  let rec wrapper pairs res =
+    match pairs with
+    | [] -> res
+    | (v, e)::pairs' ->
+      let e' = exec_exp e ~pairs:res in
+      let rec update_list ls pre =
+        match ls with
+        | [] -> pre@[(v, e')]
+        | (v', e_of_v')::ls' ->
+          if Equal.in_var v v' then
+            pre@((v, e')::ls')
+          else
+            update_list ls' (pre@[(v', e_of_v')])
+      in
+      wrapper pairs' (update_list res [])
+  in
+  wrapper assign_pairs []
+
+(* perform return operation in function definitions *)
+let return v s ~types =
+  let s' = eliminate_for s ~types in
+  let pairs = eliminate_ifelse_wrapper s' in
+  let pairs' = exec_sequence pairs in
+  let (_, res) = List.find_exn pairs' ~f:(fun (v', _) -> Equal.in_var v v') in
+  res

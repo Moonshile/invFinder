@@ -208,6 +208,7 @@ val name_match : paramref list -> paramdef list -> bool
 val apply_rule : rule -> p:paramref list -> rule
 val apply_prop : prop -> p:paramref list -> prop
 val rule_to_insts : rule -> types:typedef list -> rule list
+val prop_to_insts : prop -> types:typedef list -> prop list
 
 
 
@@ -219,3 +220,23 @@ module VarNamesWithParam :
     val of_statement : of_var:(var -> String.Set.t) -> statement -> String.Set.t
     val of_rule : of_var:(var -> String.Set.t) -> rule -> String.Set.t
   end
+
+
+
+module Equal :
+  sig
+    val in_paramref : paramref -> paramref -> bool
+    val in_var : var -> var -> bool
+  end
+
+
+
+
+val eliminate_for : statement -> types:typedef list -> statement
+val eliminate_ifelse_wrapper : statement -> (var * exp) list
+val eliminate_ifelse : statement -> statement
+val exec_exp : exp -> pairs:(var * exp) list -> exp
+val exec_formula : formula -> pairs:(var * exp) list -> formula
+val exec_sequence : (var * exp) list -> (var * exp) list
+val return : var -> statement -> types:typedef list -> exp
+

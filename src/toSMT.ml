@@ -82,15 +82,7 @@ let rec exp_act exp =
   | Param(Paramref _) -> raise Unexhausted_inst
   | Ite(f, e1, e2) -> sprintf "ite (%s) (%s) (%s)" (form_act f) (exp_act e1) (exp_act e2)
   | UIPFun(n, el) ->
-    let op =
-      match n with
-      | "add" -> "+"
-      | "minus" -> "-"
-      | "multiply" -> "*"
-      | "divide" -> "/"
-      | _ -> raise Empty_exception
-    in
-    List.reduce_exn (List.map el ~f:exp_act) ~f:(fun res x -> sprintf "(%s %s %s)" op res x)
+    List.reduce_exn (List.map el ~f:exp_act) ~f:(fun res x -> sprintf "(%s %s %s)" n res x)
 (* Translate formula to smt2 string *)
 and form_act form =
   match form with
@@ -98,15 +90,7 @@ and form_act form =
   | Miracle -> "false"
   | Eqn(e1, e2) -> sprintf "(= %s %s)" (exp_act e1) (exp_act e2)
   | UIPPred(n, el) ->
-    let op =
-     match n with
-     | "lt" -> "<"
-     | "le" -> "<="
-     | "gt" -> ">"
-     | "ge" -> ">="
-     | _ -> raise Empty_exception
-    in
-    List.reduce_exn (List.map el ~f:exp_act) ~f:(fun res x -> sprintf "(%s %s %s_" op res x)
+    List.reduce_exn (List.map el ~f:exp_act) ~f:(fun res x -> sprintf "(%s %s %s_" n res x)
   | Neg(form) -> sprintf "(not %s)" (form_act form)
   | AndList(fl) ->
     List.map fl ~f:form_act

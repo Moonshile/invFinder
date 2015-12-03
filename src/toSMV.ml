@@ -1,4 +1,5 @@
 
+open Core.Std
 open Utils
 open Structure
 
@@ -66,15 +67,7 @@ let rec exp_act exp =
   | Ite(f, e1, e2) ->
     sprintf "case\n%s : %s; TRUE : %s;\nesac" (form_act f) (exp_act e1) (exp_act e2)
   | UIPFun(n, el) ->
-    let op =
-      match n with
-      | "add" -> "+"
-      | "minus" -> "-"
-      | "multiply" -> "*"
-      | "divide" -> "/"
-      | _ -> raise Empty_exception
-    in
-    List.reduce_exn (List.map el ~f:exp_act) ~f:(fun res x -> sprintf "%s %s %s" res op x)
+    List.reduce_exn (List.map el ~f:exp_act) ~f:(fun res x -> sprintf "%s %s %s" res n x)
     |> sprintf "(%s)"
 (** Translate formula to smv string
 
@@ -87,15 +80,7 @@ and form_act form =
   | Miracle -> "FALSE"
   | Eqn(e1, e2) -> sprintf "(%s = %s)" (exp_act e1) (exp_act e2)
   | UIPPred(n, el) ->
-    let op =
-     match n with
-     | "lt" -> "<"
-     | "le" -> "<="
-     | "gt" -> ">"
-     | "ge" -> ">="
-     | _ -> raise Empty_exception
-    in
-    List.reduce_exn (List.map el ~f:exp_act) ~f:(fun res x -> sprintf "%s %s %s" res op x)
+    List.reduce_exn (List.map el ~f:exp_act) ~f:(fun res x -> sprintf "%s %s %s" res n x)
     |> sprintf "(%s)"
   | Neg(form) -> sprintf "(!%s)" (form_act form)
   | AndList(fl) ->
@@ -157,12 +142,24 @@ let rule_act r =
 
 let prop_act property =
   let Prop(_, _, f) = property in
-  sprintf "SPEC\n  AG (!%s)" (form_act f)
+  sprintf "SPEC\n  AG (%s)" (form_act f)
 
 let protocol_act {name=_; types; vardefs; init; rules; properties} =
-  let property_strs = [""] (*List.map properties ~f:prop_act*) in
-  let rule_insts = List.concat (List.map rules ~f:(rule_to_insts ~types)) in
-  let rule_proc_insts, rule_procs =List.unzip (List.map rule_insts ~f:rule_act) in
+  let property_strs = 
+    List.concat (List.map properties ~f:(prop_to_insts ~types))
+    |> List.map ~f:prop_act
+  in
+  let rule_insts =
+    List.concat (List.map rules ~f:(rule_to_insts ~types))
+    |> List.map ~f:(fun (Rule(n, pds, f, s)) ->
+      let s' =
+        exec_sequence (eliminate_ifelse_wrapper s)
+        |> List.map ~f:(fun (v, e) -> assign v e)
+      in
+      rule n pds f (parallel s')
+    )
+  in
+  let rule_proc_insts, rule_procs = List.unzip (List.map rule_insts ~f:rule_act) in
   let vardef_str = 
     sprintf "VAR\n%s" (String.concat ~sep:"\n" (List.map vardefs ~f:(vardef_act ~types)))
   in
