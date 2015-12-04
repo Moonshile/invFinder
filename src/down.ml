@@ -1,8 +1,7 @@
 
+open Core.Std
 open Utils
 open Structure
-open Preprocess
-open ToSMV
 
 let types = [ 
   enum "ind_t" (int_consts [1; 2; 3; 4; 5; 6]);
@@ -73,3 +72,8 @@ let protocol = {
   rules;
   properties;
 }
+
+
+
+let down_str = ToSMV.protocol_act (Preprocess.protocol_act protocol) in
+Out_channel.write_all "down.smv" ~data:down_str;;

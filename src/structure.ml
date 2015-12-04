@@ -184,12 +184,6 @@ type protocol = {
 }
 with sexp
 
-
-
-
-
-
-
 (** The actual parameters can't match with their definitions *)
 exception Unmatched_parameters
 
@@ -534,6 +528,8 @@ let eliminate_ifelse statement =
 
 
 
+(************************************ Candies **********************************)
+
 (* process execution of exp *)
 let rec exec_exp e ~pairs =
   match e with
@@ -587,3 +583,51 @@ let return v s ~types =
   let pairs' = exec_sequence pairs in
   let (_, res) = List.find_exn pairs' ~f:(fun (v', _) -> Equal.in_var v v') in
   res
+
+(* perform read operation of a var whose params have been changed *)
+let read_param v params_exp ~pds ~types =
+  let useful_pds = List.map params_exp ~f:(fun pe ->
+    match pe with
+    | Arr([(n, [])]) -> List.find_exn pds ~f:(fun (Paramdef(n', _)) -> n = n')
+    | _ -> raise Empty_exception
+  ) in
+  let ps = cart_product_with_paramfix useful_pds types in
+  let rec perform_read ps =
+    match ps with
+    | [] -> var v
+    | [p] -> var (apply_array v ~p)
+    | p::ps' ->
+      let form = andList (List.map2_exn p params_exp ~f:(fun pf pe ->
+        eqn (param pf) (var pe)
+      )) in
+      ite form (var (apply_array v ~p)) (perform_read ps')
+  in
+  perform_read ps
+
+(* perform write operation to a var whose params have been changed *)
+let write_param v params_exp e ~pds =
+  let useful_pds = List.map params_exp ~f:(fun pe ->
+    match pe with
+    | Arr([(n, [])]) -> List.find_exn pds ~f:(fun (Paramdef(n', _)) -> n = n')
+    | _ -> raise Empty_exception
+  ) in
+  let useful_prs = List.map useful_pds ~f:(fun (Paramdef(n, _)) -> paramref n) in
+  forStatement (
+    ifStatement (
+      andList (List.map2_exn useful_prs params_exp ~f:(fun pr pe ->
+        match pe with
+        | Arr([(_, [])]) -> eqn (param pr) (var pe)
+        | _ -> raise Empty_exception
+      ))
+    ) (
+      assign v e
+    )
+  ) useful_pds
+
+
+
+
+
+
+
+

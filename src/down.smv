@@ -52,12 +52,12 @@ SPEC
 
 MODULE Proc__rule1__1(a__1, a__2, a__3, a__4, a__5, a__6)
 ASSIGN
-next(a__1) := case (a__1 > 0) :
-  case ((1 + 1) < 6) : 
-    case (((1 + 1) = 1) & (
-      case (a__1 >= 1) : (a__1 - 1); TRUE : a__1; esac > 0
-    )) :
-      case
+next(a__1) := case
+(a__1 > 0) : case
+((1 + 1) < 6) : case
+(((1 + 1) = 1) & (case
+(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
+esac > 0)) : case
 (case
 (a__1 >= 1) : (a__1 - 1); TRUE : a__1;
 esac >= 1) : (case
