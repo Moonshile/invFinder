@@ -15,8 +15,11 @@ let vardefs = List.concat [
 
 let proc_Decrement dec =
   let cond = uipPred ">=" [var dec; const (Intc 1)] in
-  let s = assign dec (uipFun "-" [var dec; const (Intc 1)]) in
-  IfStatement(cond, s)
+  let s = assign dec (uipFun "-" [var dec; var (global "tmp")]) in
+  parallel [
+    assign (global "tmp") (const (intc 1));
+    IfStatement(cond, s)
+  ]
 
 let func_Sum () =
   let sum = global "sum" in
@@ -74,6 +77,6 @@ let protocol = {
 }
 
 
-
-let down_str = ToSMV.protocol_act (Preprocess.protocol_act protocol) in
+let preprocessed = Preprocess.protocol_act protocol in
+let down_str = ToSMV.protocol_act preprocessed in
 Out_channel.write_all "down.smv" ~data:down_str;;

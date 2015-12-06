@@ -4,6 +4,7 @@ open Utils
 open Structure
 
 let strc_to_lower = ref true
+let varnames_ref = ref []
 
 (* Translate a const to smv const *)
 let const_act c =
@@ -43,6 +44,7 @@ let vardef_act ~types vd =
   ) in
   let full_parts = cartesian_product parts in
   let full_names = List.map full_parts ~f:(fun parts -> String.concat ~sep:"." parts) in
+  varnames_ref := full_names; print_endline (String.concat ~sep:", " full_names);
   String.concat ~sep:"\n" (List.map full_names ~f:(fun n -> sprintf "%s : %s;" n type_str))
 
 (* Translate a variable to smv variable *)
@@ -99,11 +101,15 @@ let rec statement_act ?(is_init=false) s guard_str =
   match s with
   | Assign(v, e) ->
     let var_str = var_act v in
-    let exp_str = exp_act e in
-    if is_init then
-      sprintf "init(%s) := case\nTRUE : %s;\nesac;" var_str exp_str
+    if List.exists (!varnames_ref) ~f:(fun n -> n = var_str) then
+      let exp_str = exp_act e in
+      if is_init then
+        sprintf "init(%s) := case\nTRUE : %s;\nesac;" var_str exp_str
+      else begin
+        sprintf "next(%s) := case\n%s : %s;\nTRUE : %s;\nesac;" var_str guard_str exp_str var_str
+      end
     else begin
-      sprintf "next(%s) := case\n%s : %s;\nTRUE : %s;\nesac;" var_str guard_str exp_str var_str
+      print_endline (sprintf "ignore local var: %s" var_str); ""
     end
   | Parallel(ss) ->
     if ss = [] then "" else begin
@@ -128,8 +134,7 @@ let rule_act r =
   let vars_str = String.concat vars ~sep:", " in
   (* rule process instance *)
   let Rule(n, _, f, s) = r in
-  let name = escape n
-  in
+  let name = escape n in
   let rule_proc_inst = sprintf "%s : process Proc__%s(%s);" name name vars_str in
   (* rule process *)
   let guard_str = form_act f in
@@ -145,9 +150,8 @@ let prop_act property =
   sprintf "SPEC\n  AG (%s)" (form_act f)
 
 let protocol_act {name=_; types; vardefs; init; rules; properties} =
-  let property_strs = 
-    List.concat (List.map properties ~f:(prop_to_insts ~types))
-    |> List.map ~f:prop_act
+  let vardef_str = 
+    sprintf "VAR\n%s" (String.concat ~sep:"\n" (List.map vardefs ~f:(vardef_act ~types)))
   in
   let rule_insts =
     List.concat (List.map rules ~f:(rule_to_insts ~types))
@@ -160,11 +164,12 @@ let protocol_act {name=_; types; vardefs; init; rules; properties} =
     )
   in
   let rule_proc_insts, rule_procs = List.unzip (List.map rule_insts ~f:rule_act) in
-  let vardef_str = 
-    sprintf "VAR\n%s" (String.concat ~sep:"\n" (List.map vardefs ~f:(vardef_act ~types)))
-  in
   let rule_proc_insts_str = String.concat ~sep:"\n\n" rule_proc_insts in
   let init_str = sprintf "ASSIGN\n%s" (init_act init) in
+  let property_strs = 
+    List.concat (List.map properties ~f:(prop_to_insts ~types))
+    |> List.map ~f:prop_act
+  in
   let prop_str = String.concat ~sep:"\n\n" property_strs in
   let rule_procs_str = String.concat ~sep:"\n\n---------\n\n" rule_procs in
   let strs = [vardef_str; rule_proc_insts_str; init_str; prop_str] in
