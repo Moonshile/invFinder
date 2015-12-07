@@ -44,7 +44,7 @@ let vardef_act ~types vd =
   ) in
   let full_parts = cartesian_product parts in
   let full_names = List.map full_parts ~f:(fun parts -> String.concat ~sep:"." parts) in
-  varnames_ref := full_names;
+  varnames_ref := (!varnames_ref)@full_names;
   String.concat ~sep:"\n" (List.map full_names ~f:(fun n -> sprintf "%s : %s;" n type_str))
 
 (* Translate a variable to smv variable *)
@@ -134,6 +134,7 @@ let rule_act r =
   let vars_str = String.concat vars ~sep:", " in
   (* rule process instance *)
   let Rule(n, _, f, s) = r in
+  print_endline (sprintf "rule: %s" n);
   let name = escape n in
   let rule_proc_inst = sprintf "%s : process Proc__%s(%s);" name name vars_str in
   (* rule process *)
@@ -156,13 +157,6 @@ let protocol_act {name=_; types; vardefs; init; rules; properties} =
   in
   let rule_insts =
     List.concat (List.map rules ~f:(rule_to_insts ~types))
-    |> List.map ~f:(fun (Rule(n, pds, f, s)) ->
-      let s' =
-        exec_sequence (eliminate_ifelse_wrapper s)
-        |> List.map ~f:(fun (v, e) -> assign v e)
-      in
-      rule n pds f (parallel s')
-    )
   in
   let rule_proc_insts, rule_procs = List.unzip (List.map rule_insts ~f:rule_act) in
   let rule_proc_insts_str = String.concat ~sep:"\n\n" rule_proc_insts in
@@ -177,4 +171,5 @@ let protocol_act {name=_; types; vardefs; init; rules; properties} =
   let main_module = 
     sprintf "MODULE main\n%s" (String.concat ~sep:"\n\n--------------------\n\n" strs)
   in
+  print_endline (String.concat ~sep:"," (!varnames_ref));
   sprintf "%s\n\n--------------------\n\n%s" main_module rule_procs_str

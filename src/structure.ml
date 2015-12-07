@@ -345,6 +345,7 @@ let name_match params defs =
 (** Apply rule with param *)
 let apply_rule r ~p =
   let Rule(n, paramdefs, f, s) = r in
+  print_endline n;
   let name =
     if p = [] then n
     else begin
@@ -363,13 +364,16 @@ let apply_rule r ~p =
     end
   in
   if name_match p paramdefs then
-    rule name [] (apply_form f ~p) (apply_statement s ~p)
+    let f' = apply_form f ~p in
+    let s' = apply_statement s ~p in
+    rule name [] f' s'
   else
     raise Unmatched_parameters
 
 (** Apply property with param *)
 let apply_prop property ~p =
   let Prop(name, paramdefs, f) = property in
+  print_endline name;
   if name_match p paramdefs then
     prop name [] (apply_form f ~p)
   else
