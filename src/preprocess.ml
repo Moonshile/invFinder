@@ -32,8 +32,9 @@ and form_act form ~types =
 let statement_act s ~types =
   let s' = eliminate_for s ~types in
   let pairs = eliminate_ifelse_wrapper s' in
-  let pairs' = exec_sequence pairs in
-  parallel (List.map pairs' ~f:(fun (v, e) -> assign v (exp_act e ~types)))
+  let no_forall_exist = List.map pairs ~f:(fun (v, e) -> (v, exp_act e ~types)) in
+  let pairs' = exec_sequence no_forall_exist in
+  parallel (List.map pairs' ~f:(fun (v, e) -> assign v e))
 
 let rule_act (Rule(name, pds, form, s)) ~types =
   print_endline (sprintf "rule: %s" name);
