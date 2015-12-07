@@ -36,12 +36,14 @@ let statement_act s ~types =
   parallel (List.map pairs' ~f:(fun (v, e) -> assign v (exp_act e ~types)))
 
 let rule_act (Rule(name, pds, form, s)) ~types =
+  print_endline (sprintf "rule: %s" name);
   rule name pds (form_act form ~types) (statement_act s ~types)
 
 let property_act (Prop(name, pds, form)) ~types =
   prop name pds (form_act form ~types)
 
 let protocol_act {name; types; vardefs; init; rules; properties} =
+  print_endline "========== Start to preprocess ==========";
   { 
     name = name;
     types = types;
