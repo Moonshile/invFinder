@@ -44,7 +44,7 @@ let vardef_act ~types vd =
   ) in
   let full_parts = cartesian_product parts in
   let full_names = List.map full_parts ~f:(fun parts -> String.concat ~sep:"." parts) in
-  varnames_ref := full_names; print_endline (String.concat ~sep:", " full_names);
+  varnames_ref := full_names;
   String.concat ~sep:"\n" (List.map full_names ~f:(fun n -> sprintf "%s : %s;" n type_str))
 
 (* Translate a variable to smv variable *)
@@ -109,7 +109,7 @@ let rec statement_act ?(is_init=false) s guard_str =
         sprintf "next(%s) := case\n%s : %s;\nTRUE : %s;\nesac;" var_str guard_str exp_str var_str
       end
     else begin
-      print_endline (sprintf "ignore local var: %s" var_str); ""
+      print_endline (sprintf "ignore assign to local var: %s" var_str); ""
     end
   | Parallel(ss) ->
     if ss = [] then "" else begin
@@ -150,6 +150,7 @@ let prop_act property =
   sprintf "SPEC\n  AG (%s)" (form_act f)
 
 let protocol_act {name=_; types; vardefs; init; rules; properties} =
+  print_endline "========== Start to translate to SMV ==========";
   let vardef_str = 
     sprintf "VAR\n%s" (String.concat ~sep:"\n" (List.map vardefs ~f:(vardef_act ~types)))
   in

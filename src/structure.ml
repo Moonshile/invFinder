@@ -493,7 +493,8 @@ let rec eliminate_for statement ~types =
     ifelseStatement f (eliminate_for s1 ~types) (eliminate_for s2 ~types)
   | ForStatement(s, pd) ->
     let pfs = cart_product_with_paramfix pd types in
-    parallel (List.map pfs ~f:(fun p -> apply_statement s ~p))
+    let s' = eliminate_for s ~types in
+    parallel (List.map pfs ~f:(fun p -> apply_statement s' ~p))
 
 (* eliminate if statements, must eliminate all for statements before *)
 let rec eliminate_ifelse_wrapper statement =
