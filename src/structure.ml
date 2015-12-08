@@ -345,7 +345,6 @@ let name_match params defs =
 (** Apply rule with param *)
 let apply_rule r ~p =
   let Rule(n, paramdefs, f, s) = r in
-  print_endline n;
   let name =
     if p = [] then n
     else begin
@@ -373,7 +372,6 @@ let apply_rule r ~p =
 (** Apply property with param *)
 let apply_prop property ~p =
   let Prop(name, paramdefs, f) = property in
-  print_endline name;
   if name_match p paramdefs then
     prop name [] (apply_form f ~p)
   else
@@ -461,9 +459,17 @@ end
 (** Get variable names in the components *)
 module Vars = struct
 
-  let varlist_dedup = List.dedup ~compare:(fun v1 v2 ->
-    if Equal.in_var v1 v2 then 0 else compare v1 v2
-  )
+  let varlist_dedup varlist =
+    let rec wrapper varlist =
+      match varlist with
+      | [] -> []
+      | v::varlist' ->
+        if List.exists varlist' ~f:(fun v' -> Equal.in_var v v') then
+          wrapper varlist'
+        else
+          v::(wrapper varlist')
+    in
+    wrapper varlist
 
   (** Names of exp *)
   let rec of_exp e =
@@ -558,12 +564,12 @@ end
 (* unwind all for statements *)
 let rec eliminate_for statement ~types =
   match statement with
-  | Assign(_) -> statement
-  | Parallel(sl) -> parallel (List.map sl ~f:(eliminate_for ~types))
-  | IfStatement(f, s) -> ifStatement f (eliminate_for s ~types)
-  | IfelseStatement(f, s1, s2) ->
+  | Assign(_) -> print_endline "1";statement
+  | Parallel(sl) -> print_endline "2";parallel (List.map sl ~f:(eliminate_for ~types))
+  | IfStatement(f, s) -> print_endline "3";ifStatement f (eliminate_for s ~types)
+  | IfelseStatement(f, s1, s2) ->print_endline "4";
     ifelseStatement f (eliminate_for s1 ~types) (eliminate_for s2 ~types)
-  | ForStatement(s, pd) ->
+  | ForStatement(s, pd) ->print_endline "5";
     let pfs = cart_product_with_paramfix pd types in
     let s' = eliminate_for s ~types in
     parallel (List.map pfs ~f:(fun p -> apply_statement s' ~p))

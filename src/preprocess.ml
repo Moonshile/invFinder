@@ -7,6 +7,7 @@ let statement_act s ~types =
   let no_for = eliminate_for s ~types in
   let no_quant = eliminate_quant no_for ~types in
   let pairs = flatten_exec no_quant ~vars:(Vars.of_statement no_quant) in
+  print_endline (sprintf "res count : %d" (List.length pairs));
   parallel (List.map pairs ~f:(fun (v, e) -> assign v e))
 
 let rule_act (Rule(name, pds, form, s)) ~types =

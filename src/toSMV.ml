@@ -128,9 +128,12 @@ let rule_act r =
     |> String.substr_replace_all ~pattern:"]" ~with_:""
     |> String.substr_replace_all ~pattern:"." ~with_:"__"
   in
-  let vars = String.Set.to_list (VarNamesWithParam.of_rule r ~of_var:(fun v ->
-    String.Set.of_list [var_act v]
-  )) in
+  let vars =
+    String.Set.to_list (VarNamesWithParam.of_rule r ~of_var:(fun v ->
+      String.Set.of_list [var_act v]
+    ))
+    |> List.filter ~f:(fun n -> List.exists (!varnames_ref) ~f:(fun n' -> n = n'))
+  in
   let vars_str = String.concat vars ~sep:", " in
   (* rule process instance *)
   let Rule(n, _, f, s) = r in
@@ -157,6 +160,11 @@ let protocol_act {name=_; types; vardefs; init; rules; properties} =
   in
   let rule_insts =
     List.concat (List.map rules ~f:(rule_to_insts ~types))
+    |> List.map ~f:(fun (Rule(n, pds, g, s)) ->
+      let pairs = flatten_exec s ~vars:(Vars.of_statement s) in
+      print_endline n;
+      rule n pds g (parallel (List.map pairs ~f:(fun (v, e) -> assign v e)))
+    )
   in
   let rule_proc_insts, rule_procs = List.unzip (List.map rule_insts ~f:rule_act) in
   let rule_proc_insts_str = String.concat ~sep:"\n\n" rule_proc_insts in
