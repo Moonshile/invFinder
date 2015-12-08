@@ -401,6 +401,108 @@ let prop_to_insts property ~types =
 
 
 
+
+
+
+module Equal = struct
+
+  let in_paramref pr1 pr2 =
+    match (pr1, pr2) with
+    | (Paramref(n1), Paramref(n2)) -> n1 = n2
+    | (Paramfix(_, t1, c1), Paramfix(_, t2, c2)) -> t1 = t2 && c1 = c2
+    | _ -> false
+
+  let in_var v1 v2 =
+    let Arr(ls1) = v1 in
+    let Arr(ls2) = v2 in
+    match List.zip ls1 ls2 with
+    | None -> false
+    | Some(ls_pairs) ->
+      List.fold ls_pairs ~init:true ~f:(fun res ((n1, ps1), (n2, ps2)) ->
+        match List.zip ps1 ps2 with
+        | None -> false
+        | Some(p_pairs) ->
+          let pairs_res =
+            List.fold p_pairs ~init:true ~f:(fun res (p1, p2) -> res && in_paramref p1 p2)
+          in
+          res && n1 = n2 && pairs_res
+      )
+
+  let rec in_exp e1 e2 =
+    match (e1, e2) with
+    | (Const(c1), Const(c2)) -> c1 = c2
+    | (Param(pr1), Param(pr2)) -> in_paramref pr1 pr2
+    | (Var(v1), Var(v2)) -> in_var v1 v2
+    | (Ite(f1, e11, e12), Ite(f2, e21, e22)) ->
+      in_form f1 f2 && in_exp e11 e21 && in_exp e12 e22
+    | (UIPFun(n1, el1), UIPFun(n2, el2)) ->
+      List.map2_exn el1 el2 ~f:(fun e1 e2 -> in_exp e1 e2)
+      |> List.fold ~init:(n1 = n2) ~f:(fun res x -> res && x)
+    | _ -> false
+  and in_form f1 f2 =
+    match (f1, f2) with
+    | (Chaos, Chaos)
+    | (Miracle, Miracle) -> true
+    | (Eqn(e11, e12), Eqn(e21, e22)) -> in_exp e11 e21 && in_exp e12 e22
+    | (UIPPred(n1, el1), UIPPred(n2, el2)) ->
+      List.map2_exn el1 el2 ~f:(fun e1 e2 -> in_exp e1 e2)
+      |> List.fold ~init:(n1 = n2) ~f:(fun res x -> res && x)
+    | (Neg(f1), Neg(f2)) -> in_form f1 f2
+    | (AndList(fl1), AndList(fl2))
+    | (OrList(fl1), OrList(fl2)) ->
+      List.map2_exn fl1 fl2 ~f:(fun f1 f2 -> in_form f1 f2)
+      |> List.fold ~init:true ~f:(fun res x -> res && x)
+    | (Imply(f11, f12), Imply(f21, f22)) ->
+      in_form f11 f21 && in_form f12 f22
+    | _ -> false
+
+end
+
+(** Get variable names in the components *)
+module Vars = struct
+
+  let varlist_dedup = List.dedup ~compare:(fun v1 v2 ->
+    if Equal.in_var v1 v2 then 0 else compare v1 v2
+  )
+
+  (** Names of exp *)
+  let rec of_exp e =
+    match e with
+    | Const(_)
+    | Param(_) -> []
+    | Var(v) -> [v]
+    | Ite(f, e1, e2) -> varlist_dedup (List.concat [of_form f; of_exp e1; of_exp e2])
+    | UIPFun(_, el) -> varlist_dedup (List.concat (List.map el ~f:of_exp))
+  (** Names of formula *)
+  and of_form f =
+    match f with
+    | Chaos
+    | Miracle -> []
+    | Eqn(e1, e2) -> varlist_dedup (List.concat [of_exp e1; of_exp e2])
+    | UIPPred(_, el) -> varlist_dedup (List.concat (List.map el ~f:of_exp))
+    | Neg(form) -> of_form form
+    | AndList(fl)
+    | OrList(fl) -> varlist_dedup (List.concat (List.map fl ~f:of_form))
+    | Imply(f1, f2) -> varlist_dedup (List.concat [of_form f1; of_form f2])
+    | ForallFormula(_)
+    | ExistFormula(_) -> raise Empty_exception
+
+  let rec of_statement s =
+    match s with
+    | Assign(v, e) -> varlist_dedup (v::(of_exp e))
+    | Parallel(slist) -> varlist_dedup (List.concat (List.map slist ~f:of_statement))
+    | IfStatement(f, s) -> varlist_dedup (List.concat [of_form f; of_statement s])
+    | IfelseStatement(f, s1, s2) ->
+      varlist_dedup (List.concat [of_form f; of_statement s1; of_statement s2])
+    | ForStatement(_) -> raise Empty_exception
+
+  let of_rule r = 
+    match r with
+    | Rule(_, _, f, s) -> varlist_dedup (List.concat [of_form f; of_statement s])
+
+end
+
+
 (*********************************** Module Variable Names, with Param values *****************)
 
 (** Get variable names in the components *)
@@ -452,40 +554,6 @@ end
 
 
 
-module Equal = struct
-
-  let in_paramref pr1 pr2 =
-    match (pr1, pr2) with
-    | (Paramref(n1), Paramref(n2)) -> n1 = n2
-    | (Paramfix(_, t1, c1), Paramfix(_, t2, c2)) -> t1 = t2 && c1 = c2
-    | _ -> false
-
-  let in_var v1 v2 =
-    let Arr(ls1) = v1 in
-    let Arr(ls2) = v2 in
-    match List.zip ls1 ls2 with
-    | None -> false
-    | Some(ls_pairs) ->
-      List.fold ls_pairs ~init:true ~f:(fun res ((n1, ps1), (n2, ps2)) ->
-        match List.zip ps1 ps2 with
-        | None -> false
-        | Some(p_pairs) ->
-          let pairs_res =
-            List.fold p_pairs ~init:true ~f:(fun res (p1, p2) -> res && in_paramref p1 p2)
-          in
-          res && n1 = n2 && pairs_res
-      )
-  
-end
-
-
-
-
-
-
-
-
-
 
 (* unwind all for statements *)
 let rec eliminate_for statement ~types =
@@ -499,6 +567,45 @@ let rec eliminate_for statement ~types =
     let pfs = cart_product_with_paramfix pd types in
     let s' = eliminate_for s ~types in
     parallel (List.map pfs ~f:(fun p -> apply_statement s' ~p))
+
+let rec eliminate_quant_in_exp e ~types =
+  match e with
+  | Const(_)
+  | Var(_)
+  | Param(_) -> e
+  | Ite(f, e1, e2) -> 
+    ite (eliminate_quant_in_form f ~types) (eliminate_quant_in_exp e1 ~types) (eliminate_quant_in_exp e2 ~types)
+  | UIPFun(n, el) -> uipFun n (List.map el ~f:(eliminate_quant_in_exp ~types))
+and eliminate_quant_in_form form ~types =
+  match form with
+  | Chaos
+  | Miracle -> form
+  | Eqn(e1, e2) ->
+    eqn (eliminate_quant_in_exp e1 ~types) (eliminate_quant_in_exp e2 ~types)
+  | UIPPred(n, el) ->
+    uipPred n (List.map el ~f:(eliminate_quant_in_exp ~types))
+  | Neg(f) -> neg (eliminate_quant_in_form f ~types)
+  | AndList(fl) -> andList (List.map fl ~f:(eliminate_quant_in_form ~types))
+  | OrList(fl) -> orList (List.map fl ~f:(eliminate_quant_in_form ~types))
+  | Imply(f1, f2) -> imply (eliminate_quant_in_form f1 ~types) (eliminate_quant_in_form f2 ~types)
+  | ForallFormula(paramdefs, f) -> 
+    let ps = cart_product_with_paramfix paramdefs types in
+    let f' = eliminate_quant_in_form f ~types in
+    andList (List.map ps ~f:(fun p -> apply_form ~p f'))
+  | ExistFormula(paramdefs, f) -> 
+    let ps = cart_product_with_paramfix paramdefs types in
+    let f' = eliminate_quant_in_form f ~types in
+    orList (List.map ps ~f:(fun p -> apply_form ~p f'))
+
+let rec eliminate_quant statement ~types =
+  match statement with
+  | Assign(v, e) -> assign v (eliminate_quant_in_exp e ~types)
+  | Parallel(sl) -> parallel (List.map sl ~f:(eliminate_quant ~types))
+  | IfStatement(f, s) -> ifStatement (eliminate_quant_in_form f ~types) (eliminate_quant s ~types)
+  | IfelseStatement(f, s1, s2) ->
+    ifelseStatement (eliminate_quant_in_form f ~types) (eliminate_quant s1 ~types) (eliminate_quant s2 ~types)
+  | ForStatement(s, pds) -> forStatement (eliminate_quant s ~types) pds
+
 
 (* eliminate if statements, must eliminate all for statements before *)
 let rec eliminate_ifelse_wrapper statement =
@@ -581,12 +688,40 @@ let exec_sequence assign_pairs =
   in
   wrapper assign_pairs []
 
+(*  process execution of statements and eliminate ifelse,
+    must eliminate all for statements before
+*)
+let rec flatten_exec ~vars statement =
+  match statement with
+  | Assign(v, e) ->
+    List.map vars ~f:(fun v' -> if Equal.in_var v v' then (v, e) else (v', var v'))
+  | Parallel(sl) ->
+    let sl' = List.map sl ~f:(flatten_exec ~vars) in
+    List.fold sl' ~init:[] ~f:(fun res x ->
+      List.map x ~f:(fun (vx, ex) ->
+        (vx, exec_exp ex ~pairs:res)
+      )
+    )
+  | IfStatement(f, s) ->
+    let s' = flatten_exec ~vars s in
+    List.map s' ~f:(fun (v, e) -> (v, if Equal.in_exp e (var v) then e else ite f e (var v)))
+  | IfelseStatement(f, s1, s2) ->
+    let s1' = flatten_exec ~vars s1 in
+    let s2' = flatten_exec ~vars s2 in
+    List.map2_exn s1' s2' ~f:(fun (v1, e1) (v2, e2) ->
+      if Equal.in_var v1 v2 then
+        (v1, if Equal.in_exp e1 e2 then e1 else ite f e1 e2)
+      else
+        raise Empty_exception
+    )
+  | ForStatement(_) -> raise Empty_exception
+
 (* perform return operation in function definitions *)
 let return v s ~types =
-  let s' = eliminate_for s ~types in
-  let pairs = eliminate_ifelse_wrapper s' in
-  let pairs' = exec_sequence pairs in
-  let (_, res) = List.find_exn pairs' ~f:(fun (v', _) -> Equal.in_var v v') in
+  let no_for = eliminate_for s ~types in
+  let no_quant = eliminate_quant no_for ~types in
+  let pairs = flatten_exec no_quant ~vars:(Vars.of_statement no_quant) in
+  let (_, res) = List.find_exn pairs ~f:(fun (v', _) -> Equal.in_var v v') in
   res
 
 (* perform read operation of a var whose params have been changed *)
@@ -628,6 +763,7 @@ let write_param v params_exp e ~pds =
       assign v e
     )
   ) useful_pds
+
 
 
 

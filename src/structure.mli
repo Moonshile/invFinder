@@ -213,6 +213,23 @@ val prop_to_insts : prop -> types:typedef list -> prop list
 
 
 
+
+module Equal :
+  sig
+    val in_paramref : paramref -> paramref -> bool
+    val in_var : var -> var -> bool
+    val in_exp : exp -> exp -> bool
+    val in_form : formula -> formula -> bool
+  end
+
+module Vars :
+  sig
+    val of_exp : exp -> var list
+    val of_form : formula -> var list
+    val of_statement : statement -> var list
+    val of_rule : rule -> var list
+  end
+
 module VarNamesWithParam :
   sig
     val of_exp : of_var:(var -> String.Set.t) -> exp -> String.Set.t
@@ -223,22 +240,26 @@ module VarNamesWithParam :
 
 
 
-module Equal :
-  sig
-    val in_paramref : paramref -> paramref -> bool
-    val in_var : var -> var -> bool
-  end
 
 
 
 
 val eliminate_for : statement -> types:typedef list -> statement
+val eliminate_quant_in_exp : exp -> types:typedef list -> exp
+val eliminate_quant_in_form : formula -> types:typedef list -> formula
+val eliminate_quant : statement -> types:typedef list -> statement
 val eliminate_ifelse_wrapper : statement -> (var * exp) list
 val eliminate_ifelse : statement -> statement
 val exec_exp : exp -> pairs:(var * exp) list -> exp
 val exec_formula : formula -> pairs:(var * exp) list -> formula
 val exec_sequence : (var * exp) list -> (var * exp) list
+val flatten_exec : vars:var list -> statement -> (var * exp) list
 val return : var -> statement -> types:typedef list -> exp
 val read_param : var -> var list -> pds:paramdef list -> types:typedef list -> exp
 val write_param : var -> var list -> exp -> pds:paramdef list -> statement
+
+
+
+
+
 
