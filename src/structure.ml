@@ -697,43 +697,49 @@ let exec_sequence assign_pairs =
 (*  process execution of statements and eliminate ifelse,
     must eliminate all for statements before
 *)
-let rec flatten_exec ~vars statement =
+let rec flatten_exec statement =
   match statement with
   | Assign(v, e) ->
-    let res =
-      List.map vars ~f:(fun v' -> if Equal.in_var v v' then (v, e) else (v', var v'))
-    in
-    res
+    [(v, e)]
   | Parallel(sl) ->
     print_endline "parallel";
-    let sl' = List.map sl ~f:(flatten_exec ~vars) in
+    let pairs_seq = List.map sl ~f:(flatten_exec) in
     let res =
-      List.fold sl' ~init:[] ~f:(fun res x ->
-        List.map x ~f:(fun (vx, ex) ->
-          print_endline (sprintf "size: %d" (List.length res));
-          (vx, exec_exp ex ~pairs:res)
-        )
+      List.fold pairs_seq ~init:[] ~f:(fun res x ->
+        print_endline (sprintf "size: %d" (List.length res));
+        let x' = List.map x ~f:(fun (vx, ex) -> (vx, exec_exp ex ~pairs:res)) in
+        let missed = List.filter res ~f:(fun (v, _) ->
+          List.for_all x' ~f:(fun (v', _) -> not (Equal.in_var v v'))
+        ) in
+        missed@x'
       )
     in
     print_endline "end of parallel"; res
   | IfStatement(f, s) ->
-    let s' = flatten_exec ~vars s in
+    let pairs = flatten_exec s in
     let res =
-      List.map s' ~f:(fun (v, e) -> (v, if Equal.in_exp e (var v) then e else ite f e (var v)))
-    in
-    res
-  | IfelseStatement(f, s1, s2) ->
-    let s1' = flatten_exec ~vars s1 in
-    let s2' = flatten_exec ~vars s2 in
-    let res =
-      List.map2_exn s1' s2' ~f:(fun (v1, e1) (v2, e2) ->
-        if Equal.in_var v1 v2 then
-          (v1, if Equal.in_exp e1 e2 then e1 else ite f e1 e2)
-        else
-          raise Empty_exception
+      List.map pairs ~f:(fun (v, e) -> 
+        (v, if Equal.in_exp e (var v) then e else ite f e (var v))
       )
     in
     res
+  | IfelseStatement(f, s1, s2) ->
+    let pairs1 = flatten_exec s1 in
+    let pairs2 = flatten_exec s2 in
+    let part1 = List.map pairs1 ~f:(fun (v, e) ->
+      match List.find pairs2 ~f:(fun (v', _) -> Equal.in_var v v') with
+      | Some(_, e') -> (v, if Equal.in_exp e e' then e else ite f e e')
+      | None -> (v, if Equal.in_exp e (var v) then e else ite f e (var v))
+    ) in
+    let part2 =
+      List.filter pairs2 ~f:(fun (v', _) ->
+        List.for_all pairs1 ~f:(fun (v, _) -> not (Equal.in_var v v'))
+      )
+      |> List.map ~f:(fun (v', e') -> 
+        (v', if Equal.in_exp (var v') e' then e' else ite f (var v') e')
+      )
+    in
+    part1@part2
   | ForStatement(_) -> raise Empty_exception
 
 (* perform return operation in function definitions *)
@@ -741,7 +747,7 @@ let return v s ~types =
   let no_for = eliminate_for s ~types in
   let no_quant = eliminate_quant no_for ~types in
   print_endline "flatten_exec";
-  let pairs = flatten_exec no_quant ~vars:(Vars.of_statement no_quant) in
+  let pairs = flatten_exec no_quant in
   print_endline "return val";
   let (_, res) = List.find_exn pairs ~f:(fun (v', _) -> Equal.in_var v v') in
   res

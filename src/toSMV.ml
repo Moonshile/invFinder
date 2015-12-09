@@ -161,7 +161,7 @@ let protocol_act {name=_; types; vardefs; init; rules; properties} =
   let rule_insts =
     List.concat (List.map rules ~f:(rule_to_insts ~types))
     |> List.map ~f:(fun (Rule(n, pds, g, s)) ->
-      let pairs = flatten_exec s ~vars:(Vars.of_statement s) in
+      let pairs = flatten_exec s in
       print_endline n;
       rule n pds g (parallel (List.map pairs ~f:(fun (v, e) -> assign v e)))
     )
