@@ -96,7 +96,7 @@ let _tsr_type = List.concat [
   [arrdef [("speed", [])] "speed_value"];
   [arrdef [("status", [])] "tsr_state"]
 ]
-  
+
 (*
 type arrtsr_type : array[tsr_number] of tsr_type;
 
@@ -259,8 +259,7 @@ let func_max_idle_location loc =
     ) [paramdef "s" "section_number"]
   ] in
   return mloc s ~types
-  
-  
+
 
 (* 判断两个TSR是否是同一个TSR，判断依据：起始、结束区段相同并且限速速度也相同 */
 /* @param t1 第一个TSR */
@@ -316,7 +315,7 @@ let fun_first_matched_tsr t arrt_i0 =
     ) [paramdef "i0" "tsr_number"]
   ] in
   return tmp s ~types
-  
+
 
 (* 在给定的TSR数组中查找第一个无效（INVALID）TSR */
 /* @param arrt 给定的TSR数组 */

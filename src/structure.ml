@@ -564,12 +564,12 @@ end
 (* unwind all for statements *)
 let rec eliminate_for statement ~types =
   match statement with
-  | Assign(_) -> print_endline "1";statement
-  | Parallel(sl) -> print_endline "2";parallel (List.map sl ~f:(eliminate_for ~types))
-  | IfStatement(f, s) -> print_endline "3";ifStatement f (eliminate_for s ~types)
-  | IfelseStatement(f, s1, s2) ->print_endline "4";
+  | Assign(_) -> statement
+  | Parallel(sl) -> parallel (List.map sl ~f:(eliminate_for ~types))
+  | IfStatement(f, s) -> ifStatement f (eliminate_for s ~types)
+  | IfelseStatement(f, s1, s2) ->
     ifelseStatement f (eliminate_for s1 ~types) (eliminate_for s2 ~types)
-  | ForStatement(s, pd) ->print_endline "5";
+  | ForStatement(s, pd) ->
     let pfs = cart_product_with_paramfix pd types in
     let s' = eliminate_for s ~types in
     parallel (List.map pfs ~f:(fun p -> apply_statement s' ~p))
@@ -653,7 +653,7 @@ let rec exec_exp e ~pairs =
   match e with
   | Const(_)
   | Param(_) -> e
-  | Var(v) ->
+  | Var(v) ->print_endline "1";
     begin
       match List.find pairs ~f:(fun (v', _) -> Equal.in_var v v') with
       | Some((_, e')) -> e'
@@ -661,7 +661,7 @@ let rec exec_exp e ~pairs =
     end
   | Ite(f, e1, e2) -> ite (exec_formula f ~pairs) (exec_exp e1 ~pairs) (exec_exp e2 ~pairs)
   | UIPFun(n, el) -> uipFun n (List.map el ~f:(exec_exp ~pairs))
-and exec_formula form ~pairs =
+and exec_formula form ~pairs =print_endline "2";
   match form with
   | Chaos
   | Miracle -> form
@@ -700,33 +700,49 @@ let exec_sequence assign_pairs =
 let rec flatten_exec ~vars statement =
   match statement with
   | Assign(v, e) ->
-    List.map vars ~f:(fun v' -> if Equal.in_var v v' then (v, e) else (v', var v'))
+    let res =
+      List.map vars ~f:(fun v' -> if Equal.in_var v v' then (v, e) else (v', var v'))
+    in
+    res
   | Parallel(sl) ->
+    print_endline "parallel";
     let sl' = List.map sl ~f:(flatten_exec ~vars) in
-    List.fold sl' ~init:[] ~f:(fun res x ->
-      List.map x ~f:(fun (vx, ex) ->
-        (vx, exec_exp ex ~pairs:res)
+    let res =
+      List.fold sl' ~init:[] ~f:(fun res x ->
+        List.map x ~f:(fun (vx, ex) ->
+          print_endline (sprintf "size: %d" (List.length res));
+          (vx, exec_exp ex ~pairs:res)
+        )
       )
-    )
+    in
+    print_endline "end of parallel"; res
   | IfStatement(f, s) ->
     let s' = flatten_exec ~vars s in
-    List.map s' ~f:(fun (v, e) -> (v, if Equal.in_exp e (var v) then e else ite f e (var v)))
+    let res =
+      List.map s' ~f:(fun (v, e) -> (v, if Equal.in_exp e (var v) then e else ite f e (var v)))
+    in
+    res
   | IfelseStatement(f, s1, s2) ->
     let s1' = flatten_exec ~vars s1 in
     let s2' = flatten_exec ~vars s2 in
-    List.map2_exn s1' s2' ~f:(fun (v1, e1) (v2, e2) ->
-      if Equal.in_var v1 v2 then
-        (v1, if Equal.in_exp e1 e2 then e1 else ite f e1 e2)
-      else
-        raise Empty_exception
-    )
+    let res =
+      List.map2_exn s1' s2' ~f:(fun (v1, e1) (v2, e2) ->
+        if Equal.in_var v1 v2 then
+          (v1, if Equal.in_exp e1 e2 then e1 else ite f e1 e2)
+        else
+          raise Empty_exception
+      )
+    in
+    res
   | ForStatement(_) -> raise Empty_exception
 
 (* perform return operation in function definitions *)
 let return v s ~types =
   let no_for = eliminate_for s ~types in
   let no_quant = eliminate_quant no_for ~types in
+  print_endline "flatten_exec";
   let pairs = flatten_exec no_quant ~vars:(Vars.of_statement no_quant) in
+  print_endline "return val";
   let (_, res) = List.find_exn pairs ~f:(fun (v', _) -> Equal.in_var v v') in
   res
 
