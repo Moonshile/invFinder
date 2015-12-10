@@ -131,7 +131,7 @@ and form_symbolic_simp ~f form =
 
 
 (* process execution of exp *)
-let rec exec_exp e ~pairs =
+let rec exec_exp e ~pairs =print_endline "1";
   match e with
   | Const(_)
   | Param(_) -> e
@@ -143,7 +143,7 @@ let rec exec_exp e ~pairs =
     end
   | Ite(f, e1, e2) -> ite (exec_formula f ~pairs) (exec_exp e1 ~pairs) (exec_exp e2 ~pairs)
   | UIPFun(n, el) -> uipFun n (List.map el ~f:(exec_exp ~pairs))
-and exec_formula form ~pairs =
+and exec_formula form ~pairs =print_endline "2";
   match form with
   | Chaos
   | Miracle -> form
@@ -180,53 +180,62 @@ let exec_sequence assign_pairs =
 (*  process execution of statements and eliminate ifelse,
     must eliminate all for statements before
 *)
-let rec flatten_exec statement =
+let rec flatten_exec ?(env=chaos) statement =
   match statement with
   | Assign(v, e) ->
     [(v, e)]
   | Parallel(sl) ->
     print_endline "parallel";
-    let pairs_seq = List.map sl ~f:(flatten_exec) in
-    let res =
-      List.fold pairs_seq ~init:[] ~f:(fun res x ->
-        print_endline (sprintf "size: %d" (List.length res));
-        let x' = List.map x ~f:(fun (vx, ex) -> 
-          (vx, exp_symbolic_simp ~f:chaos (exec_exp ex ~pairs:res))
-        ) in
-        let missed = List.filter res ~f:(fun (v, _) ->
-          List.for_all x' ~f:(fun (v', _) -> not (Equal.in_var v v'))
-        ) in
-        missed@x'
-      )
-    in
+    let pairs_seq = List.map sl ~f:(flatten_exec ~env) in
+    print_endline (sprintf "pairs_seq length: %d" (List.length pairs_seq));
+    let res = List.fold pairs_seq ~init:[] ~f:(fun res x ->
+      print_endline (String.concat ~sep:", " (List.map res ~f:(fun (v, _) ->
+        ToSMV.var_act v
+      )));
+      let x' = List.map x ~f:(fun (vx, ex) -> 
+        (vx, exec_exp ex ~pairs:res)
+      ) in
+      let missed = List.filter res ~f:(fun (v, _) ->
+        List.for_all x' ~f:(fun (v', _) -> not (Equal.in_var v v'))
+      ) in
+      missed@x'
+    ) in
     print_endline "end of parallel"; res
   | IfStatement(f, s) ->
-    let pairs = flatten_exec s in
-    let res =
-      List.map pairs ~f:(fun (v, e) -> 
-        (v, if Equal.in_exp e (var v) then e else exp_symbolic_simp ~f:chaos (ite f e (var v)))
-      )
-    in
-    res
+    if Formula.is_tautology (imply env f) then
+      flatten_exec ~env s
+    else if Formula.is_tautology (imply env (neg f)) then
+      []
+    else
+      let pairs = flatten_exec ~env s in
+      let res = List.map pairs ~f:(fun (v, e) -> 
+        (v, if Equal.in_exp e (var v) then e else ite f e (var v))
+      ) in
+      res
   | IfelseStatement(f, s1, s2) ->
-    let pairs1 = flatten_exec s1 in
-    let pairs2 = flatten_exec s2 in
-    let part1 = List.map pairs1 ~f:(fun (v, e) ->
-      match List.find pairs2 ~f:(fun (v', _) -> Equal.in_var v v') with
-      | Some(_, e') ->
-        (v, if Equal.in_exp e e' then e else exp_symbolic_simp ~f:chaos (ite f e e'))
-      | None ->
-        (v, if Equal.in_exp e (var v) then e else exp_symbolic_simp ~f:chaos (ite f e (var v)))
-    ) in
-    let part2 =
-      List.filter pairs2 ~f:(fun (v', _) ->
-        List.for_all pairs1 ~f:(fun (v, _) -> not (Equal.in_var v v'))
-      )
-      |> List.map ~f:(fun (v', e') -> 
-        (v', if Equal.in_exp (var v') e' then e' else exp_symbolic_simp ~f:chaos (ite f (var v') e'))
-      )
-    in
-    part1@part2
+    if Formula.is_tautology (imply env f) then
+      flatten_exec ~env s1
+    else if Formula.is_tautology (imply env (neg f)) then
+      flatten_exec ~env s2
+    else
+      let pairs1 = flatten_exec ~env s1 in
+      let pairs2 = flatten_exec ~env s2 in
+      let part1 = List.map pairs1 ~f:(fun (v, e) ->
+        match List.find pairs2 ~f:(fun (v', _) -> Equal.in_var v v') with
+        | Some(_, e') ->
+          (v, if Equal.in_exp e e' then e else ite f e e')
+        | None ->
+          (v, if Equal.in_exp e (var v) then e else ite f e (var v))
+      ) in
+      let part2 =
+        List.filter pairs2 ~f:(fun (v', _) ->
+          List.for_all pairs1 ~f:(fun (v, _) -> not (Equal.in_var v v'))
+        )
+        |> List.map ~f:(fun (v', e') -> 
+          (v', if Equal.in_exp (var v') e' then e' else ite f (var v') e')
+        )
+      in
+      part1@part2
   | ForStatement(_) -> raise Empty_exception
 
 

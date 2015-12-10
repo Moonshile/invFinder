@@ -12,7 +12,7 @@ val eliminate_ifelse : statement -> statement
 val exec_exp : exp -> pairs:(var * exp) list -> exp
 val exec_formula : formula -> pairs:(var * exp) list -> formula
 (*val exec_sequence : (var * exp) list -> (var * exp) list*)
-val flatten_exec : statement -> (var * exp) list
+val flatten_exec : ?env:formula -> statement -> (var * exp) list
 
 val return : var -> statement -> types:typedef list -> exp
 val read_param : var -> var list -> pds:paramdef list -> types:typedef list -> exp

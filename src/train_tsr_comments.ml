@@ -305,27 +305,38 @@ let fun_equal_tsr t1 t2 =
 /* @param arrt 给定的TSR数组 */
 /* @return 查找结果，为索引号，0表示没有找到 
 function first_matched_tsr(t: tsr_type; arrt: arrtsr_type): TSR_NUMBER;
+var flag: boolean;
+var tmp: TSR_NUMBER;
 begin
+  flag := true;
+  tmp := 0;
 	for i : tsr_number do
-		if arrt[i].status = valid & equal_tsr(t, arrt[i]) then
-			return i;
+		if arrt[i].status = valid & equal_tsr(t, arrt[i]) & flag then
+			tmp := i;
+      flag := false;
 		endif;
 	endfor;
-	return 0;	
+	return tmp;	
 end;*)
 
 let fun_first_matched_tsr t arrt_i0 =
   let tmp = global "tmp" in
+  let flag = global "flag" in
   let s = parallel [
     assign tmp (param (paramfix "i0" "tsr_number" (intc 0)));
+    assign flag (const (boolc true));
     forStatement (
       ifStatement (
         andList [
           eqn (var (record (arrt_i0@[global "status"]))) (const _valid);
-          eqn (fun_equal_tsr t arrt_i0) (const (boolc true))
+          eqn (fun_equal_tsr t arrt_i0) (const (boolc true));
+          eqn (var flag) (const (boolc true))
         ]
       ) (
-        assign tmp (param (paramref "i0"))
+        parallel [
+          assign tmp (param (paramref "i0"));
+          assign flag (const (boolc false))
+        ]
       )
     ) [paramdef "i0" "tsr_number"]
   ] in
@@ -336,24 +347,37 @@ let fun_first_matched_tsr t arrt_i0 =
 /* @param arrt 给定的TSR数组 */
 /* @return 第一个无效TSR的索引号，0表示没有找到 
 function first_invalid_tsr(arrt: arrtsr_type): TSR_NUMBER;
+var flag: boolean;
+var tmp: TSR_NUMBER;
 begin
+  flag := true;
+  tmp := 0;
 	for i : tsr_number do
-		if arrt[i].status = invalid then
-			return i;
+		if arrt[i].status = invalid & flag then
+			tmp := i;
+      flag := false;
 		endif;
 	endfor;
-	return 0;	
+	return tmp;	
 end;*)
 
 let fun_first_invalid_tsr arrt_i1 =
   let tmp = global "tmp" in
+  let flag = global "flag" in
   let s = parallel [
     assign tmp (param (paramfix "i1" "tsr_number" (intc 0)));
+    assign flag (const (boolc true));
     forStatement (
       ifStatement (
-        eqn (var (record (arrt_i1@[global "status"]))) (const _invalid)
+        andList [
+          eqn (var (record (arrt_i1@[global "status"]))) (const _invalid);
+          eqn (var flag) (const (boolc true))
+        ]
       ) (
-        assign tmp (param (paramref "i1"))
+        parallel [
+          assign tmp (param (paramref "i1"));
+          assign flag (const (boolc false))
+        ]
       )
     ) [paramdef "i1" "tsr_number"]
   ] in
