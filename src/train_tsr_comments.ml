@@ -130,6 +130,7 @@ let _train_type = List.concat [
   record_def "tsr" [paramdef "i" "tsr_number"] _tsr_type
 ]
 
+
 (*********************************************************************)
 
 let types = [
@@ -139,6 +140,7 @@ let types = [
   _tsr_number;
   _TSR_NUMBER;
   _tsr_state;
+  enum "boolean" [boolc true; boolc false]
 ]
 
 
@@ -166,6 +168,8 @@ let tmp_vardefs = List.concat [
 ]
 
 
+let _smt_context =
+  Smt.set_context "tsr" (ToSMT.context_of ~types ~vardefs:(vardefs@tmp_vardefs))
 
 (*
 /* FUNCTIONS */
@@ -1099,9 +1103,6 @@ let protocol = {
 
 
 
-let _smt_context =
-  Smt.set_context "tsr" (ToSMT.context_of ~types ~vardefs:(vardefs@tmp_vardefs))
-in
 let down_str = ToSMV.protocol_act (Preprocess.protocol_act protocol) in
 Out_channel.write_all "tsr.smv" ~data:down_str;;
 

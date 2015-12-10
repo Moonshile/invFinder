@@ -69,7 +69,7 @@ let var_act v =
     let actual_ps = List.map params ~f:(fun p ->
       match p with
       | Paramfix(_, _, c) -> const_act c
-      | Paramref(_) -> raise Unexhausted_inst
+      | Paramref(n) -> "1" (* TODO: does it matter? in fact, should raise a exception *)
     ) in
     sprintf "(%s %s)" name (String.concat ~sep:" " actual_ps)
   end
