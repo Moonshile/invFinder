@@ -11,9 +11,14 @@ let statement_act s ~types =
   print_endline (sprintf "res count : %d" (List.length pairs));
   parallel (List.map pairs ~f:(fun (v, e) -> assign v e))
 
-let rule_act (Rule(name, pds, form, s)) ~types =
-  print_endline (sprintf "rule: %s" name);
-  rule name pds (eliminate_quant_in_form form ~types) (statement_act s ~types)
+let rule_act r ~types =
+  let rule_insts = rule_to_insts r ~types in
+  List.map rule_insts ~f:(fun (Rule(n, pds, g, s)) ->
+    print_endline (sprintf "rule: %s" n);
+    let g' = eliminate_quant_in_form g ~types in
+    let s' = statement_act s ~types in
+    rule n pds g' s'
+  )
 
 let property_act (Prop(name, pds, form)) ~types =
   prop name pds (eliminate_quant_in_form form ~types)
@@ -25,7 +30,7 @@ let protocol_act {name; types; vardefs; init; rules; properties} =
     types = types;
     vardefs = vardefs;
     init = statement_act init ~types;
-    rules = List.map rules ~f:(rule_act ~types);
+    rules = List.concat (List.map rules ~f:(rule_act ~types));
     properties = List.map properties ~f:(property_act ~types)
   }
 

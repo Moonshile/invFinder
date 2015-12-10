@@ -159,15 +159,7 @@ let protocol_act {name=_; types; vardefs; init; rules; properties} =
   let vardef_str = 
     sprintf "VAR\n%s" (String.concat ~sep:"\n" (List.map vardefs ~f:(vardef_act ~types)))
   in
-  let rule_insts =
-    List.concat (List.map rules ~f:(rule_to_insts ~types))
-    |> List.map ~f:(fun (Rule(n, pds, g, s)) ->
-      let pairs = flatten_exec s in
-      print_endline n;
-      rule n pds g (parallel (List.map pairs ~f:(fun (v, e) -> assign v e)))
-    )
-  in
-  let rule_proc_insts, rule_procs = List.unzip (List.map rule_insts ~f:rule_act) in
+  let rule_proc_insts, rule_procs = List.unzip (List.map rules ~f:rule_act) in
   let rule_proc_insts_str = String.concat ~sep:"\n\n" rule_proc_insts in
   let init_str = sprintf "ASSIGN\n%s" (init_act init) in
   let property_strs = 
