@@ -1,4 +1,6 @@
 
+open Core.Std
+open Structure
 
 val eliminate_for : statement -> types:typedef list -> statement
 val eliminate_quant_in_exp : exp -> types:typedef list -> exp
@@ -9,7 +11,7 @@ val eliminate_ifelse : statement -> statement
 
 val exec_exp : exp -> pairs:(var * exp) list -> exp
 val exec_formula : formula -> pairs:(var * exp) list -> formula
-val exec_sequence : (var * exp) list -> (var * exp) list
+(*val exec_sequence : (var * exp) list -> (var * exp) list*)
 val flatten_exec : statement -> (var * exp) list
 
 val return : var -> statement -> types:typedef list -> exp

@@ -3,6 +3,7 @@
 open Core.Std
 open Utils
 open Structure
+open Extend
 
 (*
 Train Speed Restriction Protocol 
@@ -154,6 +155,16 @@ let vardefs = List.concat [
   record_def "train" [] _train_type;
   record_def "tsr" [paramdef "i" "tsr_number"] _tsr_type
 ]
+
+let tmp_vardefs = List.concat [
+  [arrdef [("mloc", [])] "section_number"];
+  [arrdef [("flag", [])] "boolean"];
+  [arrdef [("ls", [])] "speed_value"];
+  record_def "tmptsr" [paramdef "t" "tsr_number"] _tsr_type;
+  record_def "atsr" [] _tsr_type;
+  [arrdef [("i", [])] "tsr_number"]
+]
+
 
 
 (*
@@ -1088,6 +1099,9 @@ let protocol = {
 
 
 
+let _smt_context =
+  Smt.set_context "tsr" (ToSMT.context_of ~types ~vardefs:(vardefs@tmp_vardefs))
+in
 let down_str = ToSMV.protocol_act (Preprocess.protocol_act protocol) in
 Out_channel.write_all "tsr.smv" ~data:down_str;;
 

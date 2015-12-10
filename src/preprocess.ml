@@ -2,6 +2,7 @@
 open Core.Std
 open Utils
 open Structure
+open Extend
 
 let statement_act s ~types =
   let no_for = eliminate_for s ~types in

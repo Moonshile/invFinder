@@ -88,14 +88,54 @@ let eliminate_ifelse statement =
 
 
 
-(************************************ Candies **********************************)
+
+
+
+
+let rec exp_symbolic_simp ~f e =
+  match e with
+  | Const(_)
+  | Param(_)
+  | Var(_) -> e
+  | Ite(g, e1, e2) ->
+    let g' = form_symbolic_simp ~f g in
+    if Formula.is_tautology (imply f g') then
+      exp_symbolic_simp ~f e1
+    else if Formula.is_tautology (imply f (neg g')) then
+      exp_symbolic_simp ~f e2
+    else
+      let e1' = exp_symbolic_simp ~f:(andList [f; g']) e1 in
+      let e2' = exp_symbolic_simp ~f:(andList [f; neg g']) e2 in
+      ite g' e1' e2'
+  | UIPFun(n, el) -> uipFun n (List.map el ~f:(exp_symbolic_simp ~f))
+and form_symbolic_simp ~f form =
+  match form with
+  | Chaos
+  | Miracle -> form
+  | Eqn(e1, e2) -> eqn (exp_symbolic_simp ~f e1) (exp_symbolic_simp ~f e2)
+  | UIPPred(n, el) -> uipPred n (List.map el ~f:(exp_symbolic_simp ~f))
+  | Neg(g) -> neg (form_symbolic_simp ~f g)
+  | AndList(gl) -> andList (List.map gl ~f:(form_symbolic_simp ~f))
+  | OrList(gl) -> orList (List.map gl ~f:(form_symbolic_simp ~f))
+  | Imply(g1, g2) -> imply (form_symbolic_simp ~f g1) (form_symbolic_simp ~f g2)
+  | ForallFormula(_)
+  | ExistFormula(_) -> raise Empty_exception
+
+
+
+
+
+
+
+
+
 
 (* process execution of exp *)
 let rec exec_exp e ~pairs =
   match e with
   | Const(_)
   | Param(_) -> e
-  | Var(v) ->print_endline "1";
+  | Var(v) ->
     begin
       match List.find pairs ~f:(fun (v', _) -> Equal.in_var v v') with
       | Some((_, e')) -> e'
@@ -103,7 +143,7 @@ let rec exec_exp e ~pairs =
     end
   | Ite(f, e1, e2) -> ite (exec_formula f ~pairs) (exec_exp e1 ~pairs) (exec_exp e2 ~pairs)
   | UIPFun(n, el) -> uipFun n (List.map el ~f:(exec_exp ~pairs))
-and exec_formula form ~pairs =print_endline "2";
+and exec_formula form ~pairs =
   match form with
   | Chaos
   | Miracle -> form
@@ -117,6 +157,7 @@ and exec_formula form ~pairs =print_endline "2";
   | ExistFormula(pds, f) -> existFormula pds (exec_formula f ~pairs)
 
 (* process sequence execution of statements, must eliminate all for/if statements before *)
+(* WARNING: deprecated *)
 let exec_sequence assign_pairs =
   let rec wrapper pairs res =
     match pairs with
@@ -149,7 +190,9 @@ let rec flatten_exec statement =
     let res =
       List.fold pairs_seq ~init:[] ~f:(fun res x ->
         print_endline (sprintf "size: %d" (List.length res));
-        let x' = List.map x ~f:(fun (vx, ex) -> (vx, exec_exp ex ~pairs:res)) in
+        let x' = List.map x ~f:(fun (vx, ex) -> 
+          (vx, exp_symbolic_simp ~f:chaos (exec_exp ex ~pairs:res))
+        ) in
         let missed = List.filter res ~f:(fun (v, _) ->
           List.for_all x' ~f:(fun (v', _) -> not (Equal.in_var v v'))
         ) in
@@ -161,7 +204,7 @@ let rec flatten_exec statement =
     let pairs = flatten_exec s in
     let res =
       List.map pairs ~f:(fun (v, e) -> 
-        (v, if Equal.in_exp e (var v) then e else ite f e (var v))
+        (v, if Equal.in_exp e (var v) then e else exp_symbolic_simp ~f:chaos (ite f e (var v)))
       )
     in
     res
@@ -170,19 +213,36 @@ let rec flatten_exec statement =
     let pairs2 = flatten_exec s2 in
     let part1 = List.map pairs1 ~f:(fun (v, e) ->
       match List.find pairs2 ~f:(fun (v', _) -> Equal.in_var v v') with
-      | Some(_, e') -> (v, if Equal.in_exp e e' then e else ite f e e')
-      | None -> (v, if Equal.in_exp e (var v) then e else ite f e (var v))
+      | Some(_, e') ->
+        (v, if Equal.in_exp e e' then e else exp_symbolic_simp ~f:chaos (ite f e e'))
+      | None ->
+        (v, if Equal.in_exp e (var v) then e else exp_symbolic_simp ~f:chaos (ite f e (var v)))
     ) in
     let part2 =
       List.filter pairs2 ~f:(fun (v', _) ->
         List.for_all pairs1 ~f:(fun (v, _) -> not (Equal.in_var v v'))
       )
       |> List.map ~f:(fun (v', e') -> 
-        (v', if Equal.in_exp (var v') e' then e' else ite f (var v') e')
+        (v', if Equal.in_exp (var v') e' then e' else exp_symbolic_simp ~f:chaos (ite f (var v') e'))
       )
     in
     part1@part2
   | ForStatement(_) -> raise Empty_exception
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 (* perform return operation in function definitions *)
 let return v s ~types =

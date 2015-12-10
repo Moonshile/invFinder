@@ -1,4 +1,5 @@
 
+open Core.Std
 open Utils
 open Structure
 
@@ -80,7 +81,7 @@ let rec exp_act exp =
   | Var(v) -> var_act v
   | Param(Paramfix(_, _, c)) -> const_act c
   | Param(Paramref _) -> raise Unexhausted_inst
-  | Ite(f, e1, e2) -> sprintf "ite (%s) (%s) (%s)" (form_act f) (exp_act e1) (exp_act e2)
+  | Ite(f, e1, e2) -> sprintf "(ite %s %s %s)" (form_act f) (exp_act e1) (exp_act e2)
   | UIPFun(n, el) ->
     List.reduce_exn (List.map el ~f:exp_act) ~f:(fun res x -> sprintf "(%s %s %s)" n res x)
 (* Translate formula to smt2 string *)

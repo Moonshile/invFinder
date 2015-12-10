@@ -2,6 +2,7 @@
 open Core.Std
 open Utils
 open Structure
+open Extend
 
 let strc_to_lower = ref true
 let varnames_ref = ref []
