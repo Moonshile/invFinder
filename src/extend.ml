@@ -207,7 +207,7 @@ let rec flatten_exec ?(env=chaos) statement =
     else if Formula.is_tautology (imply env (neg f)) then
       []
     else
-      let pairs = flatten_exec ~env s in
+      let pairs = flatten_exec ~env:(andList [env; f]) s in
       let res = List.map pairs ~f:(fun (v, e) -> 
         (v, if Equal.in_exp e (var v) then e else ite f e (var v))
       ) in
@@ -218,8 +218,8 @@ let rec flatten_exec ?(env=chaos) statement =
     else if Formula.is_tautology (imply env (neg f)) then
       flatten_exec ~env s2
     else
-      let pairs1 = flatten_exec ~env s1 in
-      let pairs2 = flatten_exec ~env s2 in
+      let pairs1 = flatten_exec ~env:(andList [env; f]) s1 in
+      let pairs2 = flatten_exec ~env:(andList [env; neg f]) s2 in
       let part1 = List.map pairs1 ~f:(fun (v, e) ->
         match List.find pairs2 ~f:(fun (v', _) -> Equal.in_var v v') with
         | Some(_, e') ->

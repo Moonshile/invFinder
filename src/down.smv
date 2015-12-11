@@ -9,17 +9,17 @@ a[6] : {0, 1, 2, 3, 4, 5};
 
 --------------------
 
-rule1__1 : process Proc__rule1__1(a[1], a[2], a[3], a[4], a[5], a[6]);
+rule1__1 : process Proc__rule1__1(a[1], a[2]);
 
-rule1__2 : process Proc__rule1__2(a[1], a[2], a[3], a[4], a[5], a[6]);
+rule1__2 : process Proc__rule1__2(a[2], a[3]);
 
-rule1__3 : process Proc__rule1__3(a[1], a[2], a[3], a[4], a[5], a[6]);
+rule1__3 : process Proc__rule1__3(a[3], a[4]);
 
-rule1__4 : process Proc__rule1__4(a[1], a[2], a[3], a[4], a[5], a[6]);
+rule1__4 : process Proc__rule1__4(a[4], a[5]);
 
-rule1__5 : process Proc__rule1__5(a[1], a[2], a[3], a[4], a[5], a[6]);
+rule1__5 : process Proc__rule1__5(a[5]);
 
-rule1__6 : process Proc__rule1__6(a[1], a[2], a[3], a[4], a[5], a[6]);
+rule1__6 : process Proc__rule1__6(a[6]);
 
 --------------------
 
@@ -50,468 +50,96 @@ SPEC
 
 --------------------
 
-MODULE Proc__rule1__1(a__1, a__2, a__3, a__4, a__5, a__6)
+MODULE Proc__rule1__1(a__1, a__2)
 ASSIGN
-
-next(a__6) := case
-(a__1 > 0) : case
-((1 + 1) < 6) : case
-(((1 + 1) = 6) & (a__6 > 0)) : case
-(a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac; TRUE : a__6;
-esac; TRUE : a__6;
-esac;
-TRUE : a__6;
-esac;
-next(a__5) := case
-(a__1 > 0) : case
-((1 + 1) < 6) : case
-(((1 + 1) = 5) & (a__5 > 0)) : case
-(a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac; TRUE : a__5;
-esac; TRUE : a__5;
-esac;
-TRUE : a__5;
-esac;
-next(a__4) := case
-(a__1 > 0) : case
-((1 + 1) < 6) : case
-(((1 + 1) = 4) & (a__4 > 0)) : case
-(a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac; TRUE : a__4;
-esac; TRUE : a__4;
-esac;
-TRUE : a__4;
-esac;
-next(a__3) := case
-(a__1 > 0) : case
-((1 + 1) < 6) : case
-(((1 + 1) = 3) & (a__3 > 0)) : case
-(a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac; TRUE : a__3;
-esac; TRUE : a__3;
-esac;
-TRUE : a__3;
-esac;
-next(a__2) := case
-(a__1 > 0) : case
-((1 + 1) < 6) : case
-(((1 + 1) = 2) & (a__2 > 0)) : case
-(a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac; TRUE : a__2;
-esac; TRUE : a__2;
-esac;
-TRUE : a__2;
-esac;
 next(a__1) := case
 (a__1 > 0) : case
-((1 + 1) < 6) : case
-(((1 + 1) = 1) & (case
 (a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac > 0)) : case
-(case
-(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac >= 1) : (case
-(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac - 1); TRUE : case
-(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac;
-esac; TRUE : case
-(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac;
-esac; TRUE : case
-(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac;
 esac;
 TRUE : a__1;
+esac;
+
+next(a__2) := case
+(a__1 > 0) : case
+(((1 + 1) = 2) & (a__2 > 0)) : (a__2 - 1); TRUE : a__2;
+esac;
+TRUE : a__2;
 esac;
 
 ---------
 
-MODULE Proc__rule1__2(a__1, a__2, a__3, a__4, a__5, a__6)
+MODULE Proc__rule1__2(a__2, a__3)
 ASSIGN
-
-next(a__6) := case
-(a__2 > 0) : case
-((2 + 1) < 6) : case
-(((2 + 1) = 6) & (a__6 > 0)) : case
-(a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac; TRUE : a__6;
-esac; TRUE : a__6;
-esac;
-TRUE : a__6;
-esac;
-next(a__5) := case
-(a__2 > 0) : case
-((2 + 1) < 6) : case
-(((2 + 1) = 5) & (a__5 > 0)) : case
-(a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac; TRUE : a__5;
-esac; TRUE : a__5;
-esac;
-TRUE : a__5;
-esac;
-next(a__4) := case
-(a__2 > 0) : case
-((2 + 1) < 6) : case
-(((2 + 1) = 4) & (a__4 > 0)) : case
-(a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac; TRUE : a__4;
-esac; TRUE : a__4;
-esac;
-TRUE : a__4;
-esac;
-next(a__3) := case
-(a__2 > 0) : case
-((2 + 1) < 6) : case
-(((2 + 1) = 3) & (a__3 > 0)) : case
-(a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac; TRUE : a__3;
-esac; TRUE : a__3;
-esac;
-TRUE : a__3;
-esac;
 next(a__2) := case
 (a__2 > 0) : case
-((2 + 1) < 6) : case
-(((2 + 1) = 2) & (case
 (a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac > 0)) : case
-(case
-(a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac >= 1) : (case
-(a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac - 1); TRUE : case
-(a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac;
-esac; TRUE : case
-(a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac;
-esac; TRUE : case
-(a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac;
 esac;
 TRUE : a__2;
 esac;
-next(a__1) := case
+
+next(a__3) := case
 (a__2 > 0) : case
-((2 + 1) < 6) : case
-(((2 + 1) = 1) & (a__1 > 0)) : case
-(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac; TRUE : a__1;
-esac; TRUE : a__1;
+(((2 + 1) = 3) & (a__3 > 0)) : (a__3 - 1); TRUE : a__3;
 esac;
-TRUE : a__1;
+TRUE : a__3;
 esac;
 
 ---------
 
-MODULE Proc__rule1__3(a__1, a__2, a__3, a__4, a__5, a__6)
+MODULE Proc__rule1__3(a__3, a__4)
 ASSIGN
-
-next(a__6) := case
-(a__3 > 0) : case
-((3 + 1) < 6) : case
-(((3 + 1) = 6) & (a__6 > 0)) : case
-(a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac; TRUE : a__6;
-esac; TRUE : a__6;
-esac;
-TRUE : a__6;
-esac;
-next(a__5) := case
-(a__3 > 0) : case
-((3 + 1) < 6) : case
-(((3 + 1) = 5) & (a__5 > 0)) : case
-(a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac; TRUE : a__5;
-esac; TRUE : a__5;
-esac;
-TRUE : a__5;
-esac;
-next(a__4) := case
-(a__3 > 0) : case
-((3 + 1) < 6) : case
-(((3 + 1) = 4) & (a__4 > 0)) : case
-(a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac; TRUE : a__4;
-esac; TRUE : a__4;
-esac;
-TRUE : a__4;
-esac;
 next(a__3) := case
 (a__3 > 0) : case
-((3 + 1) < 6) : case
-(((3 + 1) = 3) & (case
 (a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac > 0)) : case
-(case
-(a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac >= 1) : (case
-(a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac - 1); TRUE : case
-(a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac;
-esac; TRUE : case
-(a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac;
-esac; TRUE : case
-(a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac;
 esac;
 TRUE : a__3;
 esac;
-next(a__2) := case
+
+next(a__4) := case
 (a__3 > 0) : case
-((3 + 1) < 6) : case
-(((3 + 1) = 2) & (a__2 > 0)) : case
-(a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac; TRUE : a__2;
-esac; TRUE : a__2;
+(((3 + 1) = 4) & (a__4 > 0)) : (a__4 - 1); TRUE : a__4;
 esac;
-TRUE : a__2;
-esac;
-next(a__1) := case
-(a__3 > 0) : case
-((3 + 1) < 6) : case
-(((3 + 1) = 1) & (a__1 > 0)) : case
-(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac; TRUE : a__1;
-esac; TRUE : a__1;
-esac;
-TRUE : a__1;
+TRUE : a__4;
 esac;
 
 ---------
 
-MODULE Proc__rule1__4(a__1, a__2, a__3, a__4, a__5, a__6)
+MODULE Proc__rule1__4(a__4, a__5)
 ASSIGN
-
-next(a__6) := case
-(a__4 > 0) : case
-((4 + 1) < 6) : case
-(((4 + 1) = 6) & (a__6 > 0)) : case
-(a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac; TRUE : a__6;
-esac; TRUE : a__6;
-esac;
-TRUE : a__6;
-esac;
-next(a__5) := case
-(a__4 > 0) : case
-((4 + 1) < 6) : case
-(((4 + 1) = 5) & (a__5 > 0)) : case
-(a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac; TRUE : a__5;
-esac; TRUE : a__5;
-esac;
-TRUE : a__5;
-esac;
 next(a__4) := case
 (a__4 > 0) : case
-((4 + 1) < 6) : case
-(((4 + 1) = 4) & (case
 (a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac > 0)) : case
-(case
-(a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac >= 1) : (case
-(a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac - 1); TRUE : case
-(a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac;
-esac; TRUE : case
-(a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac;
-esac; TRUE : case
-(a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac;
 esac;
 TRUE : a__4;
 esac;
-next(a__3) := case
+
+next(a__5) := case
 (a__4 > 0) : case
-((4 + 1) < 6) : case
-(((4 + 1) = 3) & (a__3 > 0)) : case
-(a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac; TRUE : a__3;
-esac; TRUE : a__3;
+(((4 + 1) = 5) & (a__5 > 0)) : (a__5 - 1); TRUE : a__5;
 esac;
-TRUE : a__3;
-esac;
-next(a__2) := case
-(a__4 > 0) : case
-((4 + 1) < 6) : case
-(((4 + 1) = 2) & (a__2 > 0)) : case
-(a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac; TRUE : a__2;
-esac; TRUE : a__2;
-esac;
-TRUE : a__2;
-esac;
-next(a__1) := case
-(a__4 > 0) : case
-((4 + 1) < 6) : case
-(((4 + 1) = 1) & (a__1 > 0)) : case
-(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac; TRUE : a__1;
-esac; TRUE : a__1;
-esac;
-TRUE : a__1;
+TRUE : a__5;
 esac;
 
 ---------
 
-MODULE Proc__rule1__5(a__1, a__2, a__3, a__4, a__5, a__6)
+MODULE Proc__rule1__5(a__5)
 ASSIGN
 
-next(a__6) := case
-(a__5 > 0) : case
-((5 + 1) < 6) : case
-(((5 + 1) = 6) & (a__6 > 0)) : case
-(a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac; TRUE : a__6;
-esac; TRUE : a__6;
-esac;
-TRUE : a__6;
-esac;
 next(a__5) := case
 (a__5 > 0) : case
-((5 + 1) < 6) : case
-(((5 + 1) = 5) & (case
 (a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac > 0)) : case
-(case
-(a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac >= 1) : (case
-(a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac - 1); TRUE : case
-(a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac;
-esac; TRUE : case
-(a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac;
-esac; TRUE : case
-(a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac;
 esac;
 TRUE : a__5;
-esac;
-next(a__4) := case
-(a__5 > 0) : case
-((5 + 1) < 6) : case
-(((5 + 1) = 4) & (a__4 > 0)) : case
-(a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac; TRUE : a__4;
-esac; TRUE : a__4;
-esac;
-TRUE : a__4;
-esac;
-next(a__3) := case
-(a__5 > 0) : case
-((5 + 1) < 6) : case
-(((5 + 1) = 3) & (a__3 > 0)) : case
-(a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac; TRUE : a__3;
-esac; TRUE : a__3;
-esac;
-TRUE : a__3;
-esac;
-next(a__2) := case
-(a__5 > 0) : case
-((5 + 1) < 6) : case
-(((5 + 1) = 2) & (a__2 > 0)) : case
-(a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac; TRUE : a__2;
-esac; TRUE : a__2;
-esac;
-TRUE : a__2;
-esac;
-next(a__1) := case
-(a__5 > 0) : case
-((5 + 1) < 6) : case
-(((5 + 1) = 1) & (a__1 > 0)) : case
-(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac; TRUE : a__1;
-esac; TRUE : a__1;
-esac;
-TRUE : a__1;
 esac;
 
 ---------
 
-MODULE Proc__rule1__6(a__1, a__2, a__3, a__4, a__5, a__6)
+MODULE Proc__rule1__6(a__6)
 ASSIGN
 
 next(a__6) := case
 (a__6 > 0) : case
-((6 + 1) < 6) : case
-(((6 + 1) = 6) & (case
 (a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac > 0)) : case
-(case
-(a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac >= 1) : (case
-(a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac - 1); TRUE : case
-(a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac;
-esac; TRUE : case
-(a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac;
-esac; TRUE : case
-(a__6 >= 1) : (a__6 - 1); TRUE : a__6;
-esac;
 esac;
 TRUE : a__6;
-esac;
-next(a__5) := case
-(a__6 > 0) : case
-((6 + 1) < 6) : case
-(((6 + 1) = 5) & (a__5 > 0)) : case
-(a__5 >= 1) : (a__5 - 1); TRUE : a__5;
-esac; TRUE : a__5;
-esac; TRUE : a__5;
-esac;
-TRUE : a__5;
-esac;
-next(a__4) := case
-(a__6 > 0) : case
-((6 + 1) < 6) : case
-(((6 + 1) = 4) & (a__4 > 0)) : case
-(a__4 >= 1) : (a__4 - 1); TRUE : a__4;
-esac; TRUE : a__4;
-esac; TRUE : a__4;
-esac;
-TRUE : a__4;
-esac;
-next(a__3) := case
-(a__6 > 0) : case
-((6 + 1) < 6) : case
-(((6 + 1) = 3) & (a__3 > 0)) : case
-(a__3 >= 1) : (a__3 - 1); TRUE : a__3;
-esac; TRUE : a__3;
-esac; TRUE : a__3;
-esac;
-TRUE : a__3;
-esac;
-next(a__2) := case
-(a__6 > 0) : case
-((6 + 1) < 6) : case
-(((6 + 1) = 2) & (a__2 > 0)) : case
-(a__2 >= 1) : (a__2 - 1); TRUE : a__2;
-esac; TRUE : a__2;
-esac; TRUE : a__2;
-esac;
-TRUE : a__2;
-esac;
-next(a__1) := case
-(a__6 > 0) : case
-((6 + 1) < 6) : case
-(((6 + 1) = 1) & (a__1 > 0)) : case
-(a__1 >= 1) : (a__1 - 1); TRUE : a__1;
-esac; TRUE : a__1;
-esac; TRUE : a__1;
-esac;
-TRUE : a__1;
 esac;

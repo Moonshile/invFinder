@@ -2,6 +2,7 @@
 open Core.Std
 open Utils
 open Structure
+open Extend
 
 let types = [ 
   enum "ind_t" (int_consts [1; 2; 3; 4; 5; 6]);
@@ -12,6 +13,14 @@ let types = [
 let vardefs = List.concat [
   [arrdef [("a", [paramdef "i0" "ind_t"])] "val_t"];
 ]
+
+let tmp_vardefs = List.concat [
+  [arrdef [("tmp", [])] "sum_t"];
+  [arrdef [("sum", [])] "sum_t"]
+]
+
+let _smt_context = Smt.set_context "down" (ToSMT.context_of ~types ~vardefs:(vardefs@tmp_vardefs))
+
 
 let proc_Decrement dec =
   let cond = uipPred ">=" [var dec; const (Intc 1)] in

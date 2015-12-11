@@ -331,7 +331,7 @@ let rec apply_statement statement ~p =
   | IfStatement(f, s) -> ifStatement (apply_form f ~p) (apply_statement s ~p)
   | IfelseStatement(f, s1, s2) ->
     ifelseStatement (apply_form f ~p) (apply_statement s1 ~p) (apply_statement s2 ~p)
-  | ForStatement(_) -> raise Empty_exception
+  | ForStatement(s, pds) -> forStatement (apply_statement s ~p) pds
 
 (* Check if a given parameter matches with the paramdef *)
 let name_match params defs =
