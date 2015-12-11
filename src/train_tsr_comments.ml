@@ -14,6 +14,7 @@ const num_tsr : 3; /* number of tsr
 *)
 
 let num_sections = 2
+let num_tsr = 2
 
 (* TYPES 
 
@@ -65,8 +66,8 @@ type tsr_number : 1..num_tsr;
 type TSR_NUMBER : 0..num_tsr;
 *)
 
-let _tsr_number = enum "tsr_number" (int_consts [1; 2; 3])
-let _TSR_NUMBER = enum "TSR_NUMBER" (int_consts [0; 1; 2; 3])
+let _tsr_number = enum "tsr_number" (int_consts (List.map (up_to num_tsr) ~f:(fun x -> x + 1)))
+let _TSR_NUMBER = enum "TSR_NUMBER" (int_consts (up_to (num_tsr + 1)))
 
 (*
 type tsr_state : enum {
@@ -164,7 +165,8 @@ let tmp_vardefs = List.concat [
   [arrdef [("ls", [])] "speed_value"];
   record_def "tmptsr" [paramdef "t" "tsr_number"] _tsr_type;
   record_def "atsr" [] _tsr_type;
-  [arrdef [("i", [])] "tsr_number"]
+  [arrdef [("i", [])] "tsr_number"];
+  [arrdef [("tmp", [])] "tsr_number"]
 ]
 
 
@@ -999,11 +1001,11 @@ let tsr_condition_is_disabled =
 
 let rules = [
   train_moves_to_the_next_section;
-  (*train_changes_speed;
+  train_changes_speed;
   section_state_changes_from_idle_to_busy;
   section_state_changes_from_busy_to_idle;
   tsr_condition_is_enabled;
-  tsr_condition_is_disabled*)
+  tsr_condition_is_disabled
 ]
 
 

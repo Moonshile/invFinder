@@ -131,7 +131,7 @@ and form_symbolic_simp ~f form =
 
 
 (* process execution of exp *)
-let rec exec_exp e ~pairs =print_endline "1";
+let rec exec_exp e ~pairs =
   match e with
   | Const(_)
   | Param(_) -> e
@@ -143,7 +143,7 @@ let rec exec_exp e ~pairs =print_endline "1";
     end
   | Ite(f, e1, e2) -> ite (exec_formula f ~pairs) (exec_exp e1 ~pairs) (exec_exp e2 ~pairs)
   | UIPFun(n, el) -> uipFun n (List.map el ~f:(exec_exp ~pairs))
-and exec_formula form ~pairs =print_endline "2";
+and exec_formula form ~pairs =
   match form with
   | Chaos
   | Miracle -> form
@@ -185,13 +185,13 @@ let rec flatten_exec ?(env=chaos) statement =
   | Assign(v, e) ->
     [(v, e)]
   | Parallel(sl) ->
-    print_endline "parallel";
-    let pairs_seq = List.map sl ~f:(flatten_exec ~env) in
-    print_endline (sprintf "pairs_seq length: %d" (List.length pairs_seq));
-    let res = List.fold pairs_seq ~init:[] ~f:(fun res x ->
+    print_endline (sprintf "parallel length: %d" (List.length sl));
+    let res = List.fold sl ~init:[] ~f:(fun res s ->
       print_endline (String.concat ~sep:", " (List.map res ~f:(fun (v, _) ->
         ToSMV.var_act v
       )));
+      let new_env = andList (env::(List.map res ~f:(fun (v, e) -> eqn (var v) e))) in
+      let x = flatten_exec ~env:new_env s in
       let x' = List.map x ~f:(fun (vx, ex) -> 
         (vx, exec_exp ex ~pairs:res)
       ) in
