@@ -4,11 +4,10 @@ open Utils
 open Structure
 open Extend
 
-let statement_act s env ~types =
+let statement_act s ~types =
   let no_for = eliminate_for s ~types in
   let no_quant = eliminate_quant no_for ~types in
-  let pairs = flatten_exec ~env no_quant in
-  print_endline (sprintf "res count : %d" (List.length pairs));
+  let pairs = flatten_exec no_quant in
   parallel (List.map pairs ~f:(fun (v, e) -> assign v e))
 
 let rule_act r ~types =
@@ -19,7 +18,7 @@ let rule_act r ~types =
     if Formula.is_tautology (neg g') then
       None
     else
-      let s' = statement_act s g' ~types in
+      let s' = statement_act s ~types in
       Some(rule n pds g' s')
   )
 
@@ -32,7 +31,7 @@ let protocol_act {name; types; vardefs; init; rules; properties} =
     name = name;
     types = types;
     vardefs = vardefs;
-    init = statement_act init chaos ~types;
+    init = statement_act init ~types;
     rules = List.concat (List.map rules ~f:(rule_act ~types));
     properties = List.map properties ~f:(property_act ~types)
   }

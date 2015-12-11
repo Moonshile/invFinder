@@ -185,11 +185,10 @@ let rec flatten_exec ?(env=chaos) statement =
   | Assign(v, e) ->
     [(v, e)]
   | Parallel(sl) ->
-    print_endline (sprintf "parallel length: %d" (List.length sl));
     let res = List.fold sl ~init:[] ~f:(fun res s ->
-      print_endline (String.concat ~sep:", " (List.map res ~f:(fun (v, _) ->
+      (*print_endline (String.concat ~sep:", " (List.map res ~f:(fun (v, _) ->
         ToSMV.var_act v
-      )));
+      )));*)
       let new_env = andList (env::(List.map res ~f:(fun (v, e) -> eqn (var v) e))) in
       let x = flatten_exec ~env:new_env s in
       let x' = List.map x ~f:(fun (vx, ex) -> 
@@ -200,8 +199,9 @@ let rec flatten_exec ?(env=chaos) statement =
       ) in
       missed@x'
     ) in
-    print_endline "end of parallel"; res
+    res
   | IfStatement(f, s) ->
+    print_endline (if Formula.is_tautology (imply env f) then (ToSMV.form_act (imply env f)) else "...");
     if Formula.is_tautology (imply env f) then
       flatten_exec ~env s
     else if Formula.is_tautology (imply env (neg f)) then
@@ -257,9 +257,7 @@ let rec flatten_exec ?(env=chaos) statement =
 let return v s ~types =
   let no_for = eliminate_for s ~types in
   let no_quant = eliminate_quant no_for ~types in
-  print_endline "flatten_exec";
   let pairs = flatten_exec no_quant in
-  print_endline "return val";
   let (_, res) = List.find_exn pairs ~f:(fun (v', _) -> Equal.in_var v v') in
   res
 
