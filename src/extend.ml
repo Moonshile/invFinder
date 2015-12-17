@@ -92,6 +92,8 @@ let eliminate_ifelse statement =
 
 
 
+(* WARNING: deprecated *)
+(*
 let rec exp_symbolic_simp ~f e =
   match e with
   | Const(_)
@@ -118,6 +120,33 @@ and form_symbolic_simp ~f form =
   | AndList(gl) -> andList (List.map gl ~f:(form_symbolic_simp ~f))
   | OrList(gl) -> orList (List.map gl ~f:(form_symbolic_simp ~f))
   | Imply(g1, g2) -> imply (form_symbolic_simp ~f g1) (form_symbolic_simp ~f g2)
+  | ForallFormula(_)
+  | ExistFormula(_) -> raise Empty_exception
+*)
+
+
+
+
+
+
+
+let rec exp_contains_var ~v e =
+  match e with
+  | Const(_)
+  | Param(_) -> false
+  | Var(v') -> Equal.in_var v v'
+  | Ite(g, e1, e2) -> form_contains_var ~v g || exp_contains_var ~v e1 || exp_contains_var ~v e2
+  | UIPFun(_, el) -> List.exists el ~f:(fun e' -> exp_contains_var ~v e')
+and form_contains_var ~v form =
+  match form with
+  | Chaos
+  | Miracle -> false
+  | Eqn(e1, e2) -> exp_contains_var ~v e1 || exp_contains_var ~v e2
+  | UIPPred(_, el) -> List.exists el ~f:(fun e' -> exp_contains_var ~v e')
+  | Neg(f) -> form_contains_var ~v f
+  | AndList(fl)
+  | OrList(fl) -> List.exists fl ~f:(fun f -> form_contains_var ~v f)
+  | Imply(f1, f2) -> form_contains_var ~v f1 || form_contains_var ~v f2
   | ForallFormula(_)
   | ExistFormula(_) -> raise Empty_exception
 
@@ -158,7 +187,7 @@ and exec_formula form ~pairs =
 
 (* process sequence execution of statements, must eliminate all for/if statements before *)
 (* WARNING: deprecated *)
-let exec_sequence assign_pairs =
+(*let exec_sequence assign_pairs =
   let rec wrapper pairs res =
     match pairs with
     | [] -> res
@@ -175,7 +204,7 @@ let exec_sequence assign_pairs =
       in
       wrapper pairs' (update_list res [])
   in
-  wrapper assign_pairs []
+  wrapper assign_pairs []*)
 
 (*  process execution of statements and eliminate ifelse,
     must eliminate all for statements before
@@ -185,11 +214,15 @@ let rec flatten_exec ?(env=chaos) statement =
   | Assign(v, e) ->
     [(v, e)]
   | Parallel(sl) ->
+    let env_and_parts = Formula.flat_and_to_list env in
     let res = List.fold sl ~init:[] ~f:(fun res s ->
-      (*print_endline (String.concat ~sep:", " (List.map res ~f:(fun (v, _) ->
-        ToSMV.var_act v
-      )));*)
-      let new_env = andList (env::(List.map res ~f:(fun (v, e) -> eqn (var v) e))) in
+      let new_env =
+        let appended = List.map res ~f:(fun (v, e) -> eqn (var v) e) in
+        let env' = List.filter env_and_parts ~f:(fun g ->
+          List.for_all res ~f:(fun (v, _) -> not (form_contains_var ~v g))
+        ) in
+        andList (env'@appended)
+      in
       let x = flatten_exec ~env:new_env s in
       let x' = List.map x ~f:(fun (vx, ex) -> 
         (vx, exec_exp ex ~pairs:res)
@@ -201,7 +234,6 @@ let rec flatten_exec ?(env=chaos) statement =
     ) in
     res
   | IfStatement(f, s) ->
-    print_endline (if Formula.is_tautology (imply env f) then (ToSMV.form_act (imply env f)) else "...");
     if Formula.is_tautology (imply env f) then
       flatten_exec ~env s
     else if Formula.is_tautology (imply env (neg f)) then

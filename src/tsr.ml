@@ -5,10 +5,11 @@ open Utils
 open Structure
 open Extend
 
-let name = "train_tsr_comments"
+let name = "tsr"
 
-let num_sections = 2
-let num_tsr = 2
+let num_sections = 3
+let num_tsr = 3
+
 
 let _stop = strc "stop"
 let _low = strc "low"
@@ -18,7 +19,6 @@ let _full = strc "full"
 let _speed_value = enum "speed_value" [_stop; _low; _high; _full]
 
 let _section_number = enum "section_number" (int_consts (List.map (up_to num_sections) ~f:(fun x -> x + 1)))
-
 
 let _idle = strc "idle"
 let _busy = strc "busy"
@@ -32,12 +32,10 @@ let _section_type = List.concat [
 let _tsr_number = enum "tsr_number" (int_consts (List.map (up_to num_tsr) ~f:(fun x -> x + 1)))
 let _TSR_NUMBER = enum "TSR_NUMBER" (int_consts (up_to (num_tsr + 1)))
 
-
 let _invalid = strc "invalid"
 let _valid = strc "valid"
 
 let _tsr_state = enum "tsr_state" [_invalid; _valid]
-
 
 let _tsr_type = List.concat [
   [arrdef [("start", [])] "section_number"];
@@ -45,7 +43,6 @@ let _tsr_type = List.concat [
   [arrdef [("speed", [])] "speed_value"];
   [arrdef [("status", [])] "tsr_state"]
 ]
-
 
 let _ma_type = List.concat [
   [arrdef [("start", [])] "section_number"];
@@ -73,7 +70,6 @@ let types = [
   enum "boolean" [boolc true; boolc false]
 ]
 
-
 let vardefs = List.concat [
   record_def "section" [paramdef "i0" "section_number"] _section_type;
   record_def "train" [] _train_type;
@@ -94,7 +90,6 @@ let tmp_vardefs = List.concat [
 let _smt_context =
   Smt.set_context name (ToSMT.context_of ~types ~vardefs:(vardefs@tmp_vardefs))
 
-
 let func_limit_speed loc =
    let ls = global "ls" in
    let statust = record [global "train"; arr [("tsr", [paramref "t"])]; global "status"] in
@@ -107,8 +102,8 @@ let func_limit_speed loc =
         ifStatement (
           andList [
             eqn (var statust) (const _valid);
-            uipPred "<=" [var startt; var (record loc)];
-            uipPred "<=" [var (record loc); var closet]
+            uipPred "<=" [var startt; loc];
+            uipPred "<=" [loc; var closet]
           ]
         ) (
           ifelseStatement (
@@ -127,12 +122,11 @@ let func_limit_speed loc =
    ] in
    return ls s ~types
 
-
-let func_max_idle_location loc =
+let func_max_idle_location idled loc =
   let mloc = global "mloc" in
   let flag = global "flag" in
   let s = parallel [
-    assign mloc (var (record loc));
+    assign mloc loc;
     assign flag (const (boolc true));
     forStatement (
       ifStatement (
@@ -142,7 +136,10 @@ let func_max_idle_location loc =
         ]
       ) (
         ifelseStatement (
-          eqn (var (record [arr [("section", [paramref "s"])]; global "status"])) (const _idle)
+          orList [
+            eqn (var (record [arr [("section", [paramref "s"])]; global "status"])) (const _idle);
+            eqn (param (paramref "s")) idled
+          ]
         ) (
           assign mloc (param (paramref "s"))
         ) (
@@ -152,8 +149,6 @@ let func_max_idle_location loc =
     ) [paramdef "s" "section_number"]
   ] in
   return mloc s ~types
-
-
 
 let fun_equal_tsr t1 t2 =
   let tstart t = var (record (t@[global "start"])) in
@@ -189,7 +184,6 @@ let fun_first_matched_tsr t arrt_i0 =
   ] in
   return tmp s ~types
 
-
 let fun_first_invalid_tsr arrt_i1 =
   let tmp = global "tmp" in
   let flag = global "flag" in
@@ -212,7 +206,6 @@ let fun_first_invalid_tsr arrt_i1 =
   ] in
   return tmp s ~types
 
-
 let clear_tsr tsr =
   parallel [
     assign (record (tsr@[global "start"])) (const (intc 1));
@@ -221,7 +214,7 @@ let clear_tsr tsr =
     assign (record (tsr@[global "status"])) (const _invalid);
   ]
 
-let proc_compute_and_change_tsr =
+let proc_compute_and_change_tsr train_loc train_ma_close =
   let atsr = global "atsr" in
   let i = global "i" in
   parallel [
@@ -231,8 +224,8 @@ let proc_compute_and_change_tsr =
     forStatement (
       ifStatement (
         andList [
-          uipPred "<=" [var (record [global "train"; global "loc"]); param (paramref "s")];
-          uipPred "<" [param (paramref "s"); var (record [global "train"; global "ma"; global "close"])]
+          uipPred "<=" [train_loc; param (paramref "s")];
+          uipPred "<" [param (paramref "s"); train_ma_close]
         ]
       ) (
         forStatement (
@@ -249,24 +242,22 @@ let proc_compute_and_change_tsr =
               ifelseStatement (
                 uipPred "<" [
                   var (record [arr [("tsr", [paramref "t"])]; global "start"]);
-                  var (record [global "train"; global "loc"])
+                  train_loc
                 ]
               ) (
-                assign (record [atsr; global "start"]) (var (record [global "train"; global "loc"]))
+                assign (record [atsr; global "start"]) (train_loc)
               ) (
                 assign (record [atsr; global "start"]) (var (record [arr [("tsr", [paramref "t"])]; global "start"]))
               );
               ifelseStatement (
                 uipPred "<" [
                   var (record [arr [("tsr", [paramref "t"])]; global "close"]);
-                  var (record [global "train"; global "ma"; global "close"])
+                  train_ma_close;
                 ]
               ) (
                 assign (record [atsr; global "close"]) (var (record [arr [("tsr", [paramref "t"])]; global "close"]))
               ) (
-                assign (record [atsr; global "close"]) (
-                  var (record [global "train"; global "ma"; global "close"])
-                )
+                assign (record [atsr; global "close"]) train_ma_close
               );
               ifStatement (
                 eqn (fun_first_matched_tsr [atsr] [arr [("tmptsr", [paramref "i0"])]]) (const (intc 0))
@@ -314,6 +305,7 @@ let proc_compute_and_change_tsr =
       )
     ) [paramdef "t" "tsr_number"]
   ]
+
 
 
 let fun_exist_valid_tsr atsr arrt_i2 =
@@ -397,43 +389,40 @@ let init = parallel[
 
 
 
+
+
 let train_moves_to_the_next_section =
   let name = "train_moves_to_the_next_section" in
-  let params = [] in
-  let formula = uipPred "<" [
-    var (record [global "train"; global "loc"]);
-    var (record [global "train"; global "ma"; global "close"])
+  let params = [
+    paramdef "train_loc" "section_number";
+    paramdef "train_ma_close" "section_number"
+  ] in
+  let train_loc = paramref "train_loc" in
+  let train_ma_close = paramref "train_ma_close" in
+  let train_loc_plus_1 = uipFun "+" [param train_loc; const (intc 1)] in
+  let formula = andList [
+    eqn (var (record [global "train"; global "loc"])) (param train_loc);
+    eqn (var (record [global "train"; global "ma"; global "close"])) (param train_ma_close);
+    uipPred "<" [param train_loc; param train_ma_close]
   ] in
   let statement = parallel [
+    assign (record [arr [("section", [train_loc])]; global "status"]) (const _idle);
+    assign (record [global "train"; global "loc"]) train_loc_plus_1;
     forStatement (
       ifStatement (
-        eqn (param (paramref "s")) (var (record [global "train"; global "loc"]))
-      ) (
-        assign (record [arr [("section", [paramref "s"])]; global "status"]) (const _idle)
-      )
-    ) [paramdef "s" "section_number"];
-    assign (record [global "train"; global "loc"]) (
-      uipFun "+" [var (record [global "train"; global "loc"]); const (intc 1)]
-    );
-    forStatement (
-      ifStatement (
-        eqn (param (paramref "s")) (var (record [global "train"; global "loc"]))
+        eqn (param (paramref "s")) train_loc_plus_1
       ) (
         assign (record [arr [("section", [paramref "s"])]; global "status"]) (const _busy)
       )
     ) [paramdef "s" "section_number"];
-    assign (record [global "train"; global "ma"; global "start"]) (var (record [global "train"; global "loc"]));
-    proc_compute_and_change_tsr;
+    assign (record [global "train"; global "ma"; global "start"]) train_loc_plus_1;
+    proc_compute_and_change_tsr train_loc_plus_1 (param train_ma_close);
     assign (record [global "train"; global "speed"]) (
-      ite (
-        orList [
-          uipPred "<" [
-            var (record [global "train"; global "loc"]);
-            var (record [global "train"; global "ma"; global "close"])
-          ];
-          eqn (var (record [global "train"; global "ma"; global "stopend"])) (const (boolc false))
-        ]
-      ) (func_limit_speed [global "train"; global "loc"]) (const _stop)
+      let g = orList [
+        uipPred "<" [train_loc_plus_1; param train_ma_close];
+        eqn (var (record [global "train"; global "ma"; global "stopend"])) (const (boolc false))
+      ] in
+      ite g (func_limit_speed train_loc_plus_1) (const _stop)
     )
   ] in
   rule name params formula statement
@@ -442,25 +431,28 @@ let train_moves_to_the_next_section =
 
 
 
-
 let train_changes_speed =
   let name = "train_changes_speed" in
-  let params = [] in
+  let params = [
+    paramdef "train_loc" "section_number";
+    paramdef "train_ma_close" "section_number"
+  ] in
+  let train_loc = paramref "train_loc" in
+  let train_ma_close = paramref "train_ma_close" in
   let formula = andList [
-    uipPred "<" [
-      var (record [global "train"; global "loc"]);
-      var (record [global "train"; global "ma"; global "close"])
-    ];
-    neg (eqn (var (record [global "train"; global "speed"])) (func_limit_speed [global "train"; global "loc"]))
+    eqn (var (record [global "train"; global "loc"])) (param train_loc);
+    eqn (var (record [global "train"; global "ma"; global "close"])) (param train_ma_close);
+    uipPred "<=" [param train_loc; param train_ma_close];
+    neg (eqn (var (record [global "train"; global "speed"])) (func_limit_speed (param train_loc)))
   ] in
   let statement =
     let value = ite (
       orList [
-        uipPred "<" [var (record [global "train"; global "loc"]); var (record [global "train"; global "ma"; global "close"])];
+        uipPred "<" [param train_loc; param train_ma_close];
         eqn (var (record [global "train"; global "ma"; global "stopend"])) (const (boolc false))
       ]
     ) (
-      func_limit_speed [global "train"; global "loc"]
+      func_limit_speed (param train_loc)
     ) (
       const _stop
     ) in
@@ -488,29 +480,43 @@ let whether_train_reaches_its_stopend =
 
 
 
+
+
+
 let section_state_changes_from_idle_to_busy =
   let name = "section_state_changes_from_idle_to_busy" in
-  let params = [paramdef "sec" "section_number"] in
+  let params = [
+    paramdef "sec" "section_number";
+    paramdef "train_loc" "section_number";
+    paramdef "train_ma_close" "section_number";
+    paramdef "train_ma_start" "section_number";
+  ] in
+  let train_loc = paramref "train_loc" in
+  let train_ma_close = paramref "train_ma_close" in
+  let train_ma_start = paramref "train_ma_start" in
+  let sec_minus_1 = uipFun "-" [param (paramref "sec"); const (intc 1)] in
   let formula = andList [
+    eqn (var (record [global "train"; global "loc"])) (param train_loc);
+    eqn (var (record [global "train"; global "ma"; global "close"])) (param train_ma_close);
+    eqn (var (record [global "train"; global "ma"; global "start"])) (param train_ma_start);
     eqn (var (record [arr [("section", [paramref "sec"])]; global "status"])) (const _idle);
-    uipPred "<" [var (record [global "train"; global "loc"]); param (paramref "sec")]
+    uipPred "<" [param train_loc; param (paramref "sec")]
+  ] in
+  let if_cond = andList [
+    uipPred "<=" [param train_ma_start; param (paramref "sec")];
+    uipPred "<=" [param (paramref "sec"); param train_ma_close]
   ] in
   let statement = parallel [
     assign (record [arr [("section", [paramref "sec"])]; global "status"]) (const _busy);
-    ifStatement (
-      andList [
-        uipPred "<=" [var (record [global "train"; global "ma"; global "start"]); param (paramref "sec")];
-        uipPred "<=" [param (paramref "sec"); var (record [global "train"; global "ma"; global "close"])]
-      ]
-    ) (
-      parallel [
-        assign (record [global "train"; global "ma"; global "close"]) (uipFun "-" [param (paramref "sec"); const (intc 1)]);
-        assign (record [global "train"; global "ma"; global "stopend"]) (const (boolc false))
-      ]
-    );
-    proc_compute_and_change_tsr;
+    ifStatement if_cond (parallel [
+      assign (record [global "train"; global "ma"; global "close"]) sec_minus_1;
+      assign (record [global "train"; global "ma"; global "stopend"]) (const (boolc false))
+    ]);
+    proc_compute_and_change_tsr (param train_loc) (ite if_cond sec_minus_1 (param train_ma_close));
   ] in
   rule name params formula statement
+
+
 
 
 
@@ -519,21 +525,31 @@ let section_state_changes_from_idle_to_busy =
 
 let section_state_changes_from_busy_to_idle =
   let name = "section_state_changes_from_busy_to_idle" in
-  let params = [paramdef "sec" "section_number"] in
+  let params = [
+    paramdef "sec" "section_number";
+    paramdef "train_loc" "section_number";
+    paramdef "train_ma_close" "section_number";
+    paramdef "new_close" "section_number";
+  ] in
+  let train_loc = paramref "train_loc" in
+  let train_ma_close = paramref "train_ma_close" in
+  let new_close = paramref "new_close" in
   let formula = andList [
+    eqn (var (record [global "train"; global "loc"])) (param train_loc);
+    eqn (var (record [global "train"; global "ma"; global "close"])) (param train_ma_close);
+    eqn (param new_close) (func_max_idle_location (param (paramref "sec")) (param train_ma_close));
     eqn (var (record [arr [("section", [paramref "sec"])]; global "status"])) (const _busy);
-    uipPred "<" [var (record [global "train"; global "loc"]); param (paramref "sec")]
+    uipPred "<" [param train_loc; param (paramref "sec")]
   ] in
   let statement = parallel [
     assign (record [arr [("section", [paramref "sec"])]; global "status"]) (const _idle);
-    assign (record [global "train"; global "ma"; global "close"]) (func_max_idle_location [global "train"; global "ma"; global "close"]);
-    ifStatement (neg (eqn (var (record [global "train"; global "ma"; global "close"])) (param (paramref "sec")))) (
+    assign (record [global "train"; global "ma"; global "close"]) (param new_close);
+    ifStatement (neg (eqn (param new_close) (param (paramref "sec")))) (
       assign (record [global "train"; global "ma"; global "stopend"]) (const (boolc false))
     );
-    proc_compute_and_change_tsr;
+    proc_compute_and_change_tsr (param train_loc) (param new_close);
   ] in
   rule name params formula statement
-
 
 
 
@@ -545,9 +561,15 @@ let tsr_condition_is_enabled =
     paramdef "tnum" "tsr_number";
     paramdef "bgn" "section_number";
     paramdef "fin" "section_number";
-    paramdef "spd" "speed_value"
+    paramdef "spd" "speed_value";
+    paramdef "train_loc" "section_number";
+    paramdef "train_ma_close" "section_number";
   ] in
+  let train_loc = paramref "train_loc" in
+  let train_ma_close = paramref "train_ma_close" in
   let formula = andList [
+    eqn (var (record [global "train"; global "loc"])) (param train_loc);
+    eqn (var (record [global "train"; global "ma"; global "close"])) (param train_ma_close);
     eqn (var (record [arr [("tsr", [paramref "tnum"])]; global "status"])) (const _invalid);
     uipPred "<" [param (paramref "bgn"); param (paramref "fin")];
     neg (eqn (param (paramref "spd")) (const _stop));
@@ -558,7 +580,7 @@ let tsr_condition_is_enabled =
     assign (record [arr [("tsr", [paramref "tnum"])]; global "start"]) (param (paramref "bgn"));
     assign (record [arr [("tsr", [paramref "tnum"])]; global "close"]) (param (paramref "fin"));
     assign (record [arr [("tsr", [paramref "tnum"])]; global "speed"]) (param (paramref "spd"));
-    proc_compute_and_change_tsr;
+    proc_compute_and_change_tsr (param train_loc) (param train_ma_close);
   ] in
   rule name params formula statement
 
@@ -567,13 +589,25 @@ let tsr_condition_is_enabled =
 
 
 
+
+
 let tsr_condition_is_disabled =
   let name = "tsr_condition_is_disabled" in
-  let params = [paramdef "tnum" "tsr_number"] in
-  let formula = eqn (var (record [arr [("tsr", [paramref "tnum"])]; global "status"])) (const _valid) in
+  let params = [
+    paramdef "tnum" "tsr_number";
+    paramdef "train_loc" "section_number";
+    paramdef "train_ma_close" "section_number";
+  ] in
+  let train_loc = paramref "train_loc" in
+  let train_ma_close = paramref "train_ma_close" in
+  let formula = andList [
+    eqn (var (record [global "train"; global "loc"])) (param train_loc);
+    eqn (var (record [global "train"; global "ma"; global "close"])) (param train_ma_close);
+    eqn (var (record [arr [("tsr", [paramref "tnum"])]; global "status"])) (const _valid)
+  ] in
   let statement = parallel [
     clear_tsr [arr [("tsr", [paramref "tnum"])]];
-    proc_compute_and_change_tsr;
+    proc_compute_and_change_tsr (param train_loc) (param train_ma_close);
   ] in
   rule name params formula statement
 
@@ -624,6 +658,7 @@ let valid_tsr_is_always_sent_to_trains_tsr =
 
 
 
+
 let trains_tsr_is_always_legal =
   let name = "trains_tsr_is_always_legal" in
   let params = [paramdef "tnum" "tsr_number"] in
@@ -635,6 +670,7 @@ let trains_tsr_is_always_legal =
     )
   in
   prop name params formula
+
 
 
 

@@ -13,13 +13,14 @@ let statement_act s ~types =
 let rule_act r ~types =
   let rule_insts = rule_to_insts r ~types in
   List.filter_map rule_insts ~f:(fun (Rule(n, pds, g, s)) ->
-    print_endline (sprintf "rule: %s" n);
     let g' = eliminate_quant_in_form g ~types in
     if Formula.is_tautology (neg g') then
       None
-    else
+    else begin
+      print_endline (sprintf "rule: %s" n);
       let s' = statement_act s ~types in
       Some(rule n pds g' s')
+    end
   )
 
 let property_act (Prop(name, pds, form)) ~types =
