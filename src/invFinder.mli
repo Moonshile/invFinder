@@ -72,8 +72,12 @@ val get_rname_of_crname : string -> string
 val concrete_prop_2_form : concrete_prop -> Paramecium.formula
 val form_2_concreate_prop : ?id:int -> ?rename:bool -> Paramecium.formula -> concrete_prop
 
+val statement_2_assigns : statement -> (var * exp) list
+
 (** Convert t to a string *)
 val to_str : t -> string
+
+val pre_cond : formula -> (var * exp) list -> (formula * formula) list
 
 (** Find invs and causal relations of a protocol
 
