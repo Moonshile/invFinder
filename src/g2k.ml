@@ -25,7 +25,7 @@ let _False = boolc false
 let types = [
   enum "CACHE_STATE" [_I; _S; _E];
   enum "MSG_CMD" [_Empty; _ReqS; _ReqE; _Inv; _InvAck; _GntS; _GntE];
-  enum "NODE" (int_consts [1; 2]);
+  enum "NODE" (int_consts [1; 2; 3]);
   enum "DATA" (int_consts [1; 2]);
   enum "boolean" [_True; _False];
 ]
@@ -199,6 +199,6 @@ let rule_insts = List.concat (List.map rules ~f:(fun r ->
 )) in
 let endF = eqn (var (record [arr [("Cache", [paramfix "i" "NODE" (intc 1)])]; global "State"])) (const _E) in
 let startF = eqn (var (record [arr [("Cache", [paramfix "i" "NODE" (intc 1)])]; global "State"])) (const _I) in
-let table = FlowFinder.bfs startF endF rule_insts ~types in
+let table = FlowFinder.bfs startF endF rule_insts in
 print_endline (sprintf "table size: %d" (Hashtbl.length table));;
 

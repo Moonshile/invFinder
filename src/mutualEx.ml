@@ -99,6 +99,6 @@ let rule_insts = List.concat (List.map rules ~f:(fun r ->
 )) in
 let endF = eqn (var (arr [("n", [paramfix "i" "client" (intc 1)])])) (const _E) in
 let startF = eqn (var (arr [("n", [paramfix "i" "client" (intc 1)])])) (const _I) in
-let table = FlowFinder.bfs startF endF rule_insts ~types in
+let table = FlowFinder.bfs startF endF rule_insts in
 print_endline (sprintf "table size: %d" (Hashtbl.length table));;
 
