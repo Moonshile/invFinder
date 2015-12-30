@@ -14,14 +14,11 @@ type flowpath =
 let flowPath form rname branch = FlowPath(form, rname, branch)
 
 
-(*  key: parameterized form component
-    value: formula states that contain this component represented by the key
-*)
-let ctable = Hashtbl.create ~hashable:String.hashable ()
-
 (*  key: string of the formula state
     value: tuple of
       formula,
+      components of the formula,
+      string format of the components,
       flowpath of states called enders which are endstate of this state
     -- means that the initial state has only enders, and terminate state has nothing
 *)
@@ -41,38 +38,44 @@ let component_is_parameterized form =
   | _ -> raise Empty_exception
 
 
-let add_path_to_component end_state component rname branch =
-  match component_is_parameterized component with
-  | false -> ()
-  | true ->
-    let start_state_strs = Hashtbl.find_exn ctable (ToStr.Smv.form_act component) in
-    let end_state_str = ToStr.Smv.form_act end_state in
-    let path = flowPath end_state_str rname branch in
-    List.fold start_state_strs ~init:() ~f:(fun res x ->
-      let (f, enders) = Hashtbl.find_exn state_table x in
-      Hashtbl.replace state_table ~key:x ~data:(f, enders@[path]);
-      res
-    )
+
+let find_repeat_state new_state parent_state_str =
+  let (p_state, p_coms, p_com_strs, paths) =
+    Hashtbl.find_exn state_table parent_state_str
+  in
+  let new_state_com_strs = List.filter_map (flat_and_to_list new_state) ~f:(fun com ->
+    let com_str = ToStr.Smv.form_act com in
+    let paramed = component_is_parameterized com in
+    let is_new = (List.for_all p_com_strs ~f:(fun ps -> not (ps = com_str))) in
+    if paramed && is_new then Some com_str else None
+  ) in
+  let rec wrapper queue accessed =
+    match queue with
+    | [] -> None
+    | q::queue' ->
+      let (state, coms, com_strs, paths) = Hashtbl.find_exn state_table q in
+      if List.exists com_strs ~f:(fun cs ->
+        List.exists new_state_com_strs ~f:(fun ncs -> cs = ncs)
+      ) then
+        Some q
+      else begin
+        let accessed' = String.Set.add accessed q in
+        let new_parents = List.filter_map paths ~f:(fun (FlowPath(form, _, _)) ->
+          if String.Set.exists accessed' ~f:(fun a -> a = form) then None else Some form
+        ) in
+        wrapper (queue'@new_parents) accessed'
+      end
+  in
+  match wrapper [parent_state_str] String.Set.empty with
+  | None -> List.find (Hashtbl.keys state_table) ~f:(fun s -> s = ToStr.Smv.form_act new_state)
+  | Some(s) -> Some s
 
 
-let add_path_to_components end_state components rname branch =
-  List.fold components ~init:() ~f:(fun res x ->
-    add_path_to_component end_state x rname branch; res
-  )
-
-
-let add_components_in_form form =
-  let ands = flat_and_to_list form in
-  let form_str = ToStr.Smv.form_act form in
-  List.fold ands ~init:() ~f:(fun res x ->
-    if component_is_parameterized x then
-      let key = ToStr.Smv.form_act x in
-      Hashtbl.replace ctable ~key ~data:[form_str]; res
-    else begin
-      res
-    end
-  )
-
+let add_new_state state paths =
+  let coms = flat_and_to_list state in
+  let com_strs = List.map coms ~f:ToStr.Smv.form_act in
+  let data = (state, coms, com_strs, paths) in
+  Hashtbl.add_exn state_table ~key:(ToStr.Smv.form_act state) ~data
 
 
 let access_rule startF endF r =
@@ -92,27 +95,23 @@ let access_rule startF endF r =
     | (branch, end_form)::ends' ->
       let startF_str = ToStr.Smv.form_act startF in
       if is_tautology (imply (andList [g; branch]) startF) then
-        let (f, enders) = Hashtbl.find_exn state_table startF_str in
-        let data = (f, enders@[flowPath endF_str rn branch]) in
+        let (f, coms, com_strs, enders) = Hashtbl.find_exn state_table startF_str in
+        let data = (f, coms, com_strs, enders@[flowPath endF_str rn branch]) in
         print_endline ("bingo!!! rule: "^rn^"; end - "^endF_str);
         Hashtbl.replace state_table ~key:startF_str ~data
       else begin
         let new_state = simplify (andList [g; branch; end_form]) in
         let new_state_str = ToStr.Smv.form_act new_state in
-        let new_state_components = flat_and_to_list new_state in
-        let discovered_components = List.filter new_state_components ~f:(fun nsc ->
-          let nsc_str = ToStr.Smv.form_act nsc in
-          List.exists (Hashtbl.keys ctable) ~f:(fun c -> nsc_str = c)
-        ) in
-        print_endline ("path!!! rule: "^rn^"; new - "^new_state_str^"; end - "^endF_str);
-        if List.is_empty discovered_components then
-          (add_components_in_form new_state;
+        match find_repeat_state new_state endF_str with
+        | None ->
+          print_endline ("path!!! rule: "^rn^"; new - "^new_state_str^"; end - "^endF_str);
           Queue.enqueue discovered new_state_str;
-          let data = (new_state, [flowPath endF_str rn branch]) in
-          Hashtbl.replace state_table ~key:new_state_str ~data)
-        else begin
-          add_path_to_components endF discovered_components rn branch
-        end
+          add_new_state new_state [flowPath endF_str rn branch]
+        | Some(p) ->
+          print_endline ("path!!! rule: "^rn^"; old - "^new_state_str^"; end - "^endF_str);
+          let (f, coms, com_strs, enders) = Hashtbl.find_exn state_table p in
+          let data = (f, coms, com_strs, enders@[flowPath endF_str rn branch]) in
+          Hashtbl.replace state_table ~key:p ~data
       end;
       wrapper ends'
   in
@@ -120,16 +119,12 @@ let access_rule startF endF r =
 
 
 let bfs startF endF rs =
-  let startF_str = ToStr.Smv.form_act startF in
-  Hashtbl.add_exn state_table ~key:startF_str ~data:(startF, []);
-  let endF_str = ToStr.Smv.form_act endF in
-  Queue.enqueue discovered endF_str;
-  Hashtbl.add_exn state_table ~key:endF_str ~data:(endF, []);
-  add_components_in_form startF;
-  add_components_in_form endF;
+  add_new_state startF [];
+  add_new_state endF [];
+  Queue.enqueue discovered (ToStr.Smv.form_act endF);
   while not (Queue.is_empty discovered) do
     let state = Queue.dequeue_exn discovered in
-    let (state_form, _) = Hashtbl.find_exn state_table state in
+    let (state_form, _, _, _) = Hashtbl.find_exn state_table state in
     List.fold ~init:() rs ~f:(fun res r -> access_rule startF state_form r; res)
   done;
   state_table

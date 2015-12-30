@@ -7,4 +7,4 @@ type flowpath =
   | FlowPath of string * string * formula
 
 val bfs : formula -> formula -> rule list ->
-  (string, formula * flowpath list) Hashtbl.t
+  (string, formula * formula list * string list * flowpath list) Hashtbl.t
