@@ -104,5 +104,6 @@ let () = run_with_cmdline (fun () ->
     arr [("n", [paramfix "i" "client" (intc 1)])]
   ] in
   let table = FlowFinder.bfs core_vars startF endF rule_insts in
-  print_endline (sprintf "table size: %d" (Hashtbl.length table))
+  let dot_str = FlowFinder.table_to_dot table in
+  Out_channel.write_all (name^".dot") dot_str
 )

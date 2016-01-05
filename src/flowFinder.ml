@@ -16,6 +16,7 @@ let flowPath form rname branch = FlowPath(form, rname, branch)
 
 (*  key: string of the formula state
     value: tuple of
+      id,
       formula,
       components of the formula,
       string format of the components,
@@ -45,7 +46,7 @@ let component_is_parameterized form =
 
 
 let find_repeat_state core_var_strs new_state parent_state_str =
-  let (p_state, p_coms, p_com_strs, paths) =
+  let (_, _, _, p_com_strs, _) =
     Hashtbl.find_exn state_table parent_state_str
   in
   let new_state_com_strs = List.filter_map (flat_and_to_list new_state) ~f:(fun com ->
@@ -73,7 +74,7 @@ let find_repeat_state core_var_strs new_state parent_state_str =
     match queue with
     | [] -> None
     | q::queue' ->
-      let (state, coms, com_strs, paths) = Hashtbl.find_exn state_table q in
+      let (_, _, _, com_strs, paths) = Hashtbl.find_exn state_table q in
       if List.exists com_strs ~f:(fun cs ->
         List.exists new_state_com_strs ~f:(fun ncs -> cs = ncs)
       ) then
@@ -92,10 +93,13 @@ let find_repeat_state core_var_strs new_state parent_state_str =
 
 
 let add_new_state state paths =
+  let id = Hashtbl.length state_table in
   let coms = flat_and_to_list state in
   let com_strs = List.map coms ~f:ToStr.Smv.form_act in
-  let data = (state, coms, com_strs, paths) in
-  Hashtbl.add_exn state_table ~key:(ToStr.Smv.form_act state) ~data
+  let data = (id, state, coms, com_strs, paths) in
+  let key = ToStr.Smv.form_act state in
+  print_endline (sprintf "%d: %s" id key);
+  Hashtbl.add_exn state_table ~key ~data
 
 
 let access_rule core_var_strs startF endF r =
@@ -115,22 +119,22 @@ let access_rule core_var_strs startF endF r =
     | (branch, end_form)::ends' ->
       let startF_str = ToStr.Smv.form_act startF in
       if is_tautology (imply (andList [g; branch]) startF) then
-        let (f, coms, com_strs, enders) = Hashtbl.find_exn state_table startF_str in
-        let data = (f, coms, com_strs, enders@[flowPath endF_str rn branch]) in
-        print_endline ("bingo!!! rule: "^rn^"; end - "^endF_str);
+        let (id, f, coms, com_strs, enders) = Hashtbl.find_exn state_table startF_str in
+        let data = (id, f, coms, com_strs, enders@[flowPath endF_str rn branch]) in
+        (*print_endline ("bingo!!! rule: "^rn^"; end - "^endF_str);*)
         Hashtbl.replace state_table ~key:startF_str ~data
       else begin
         let new_state = simplify (andList [g; branch; end_form]) in
         let new_state_str = ToStr.Smv.form_act new_state in
         match find_repeat_state core_var_strs new_state endF_str with
         | None ->
-          print_endline ("path!!! rule: "^rn^"; new - "^new_state_str^"; end - "^endF_str);
+          (*print_endline ("path!!! rule: "^rn^"; new - "^new_state_str^"; end - "^endF_str);*)
           Queue.enqueue discovered new_state_str;
           add_new_state new_state [flowPath endF_str rn branch]
         | Some(p) ->
-          print_endline ("path!!! rule: "^rn^"; old - "^new_state_str^"; end - "^endF_str);
-          let (f, coms, com_strs, enders) = Hashtbl.find_exn state_table p in
-          let data = (f, coms, com_strs, enders@[flowPath endF_str rn branch]) in
+          (*print_endline ("path!!! rule: "^rn^"; old - "^new_state_str^"; end - "^endF_str);*)
+          let (id, f, coms, com_strs, enders) = Hashtbl.find_exn state_table p in
+          let data = (id, f, coms, com_strs, enders@[flowPath endF_str rn branch]) in
           Hashtbl.replace state_table ~key:p ~data
       end;
       wrapper ends'
@@ -145,14 +149,29 @@ let bfs core_vars startF endF rs =
   let core_var_strs = List.map core_vars ~f:ToStr.Smv.var_act in
   while not (Queue.is_empty discovered) do
     let state = Queue.dequeue_exn discovered in
-    let (state_form, _, _, _) = Hashtbl.find_exn state_table state in
+    let (_, state_form, _, _, _) = Hashtbl.find_exn state_table state in
     List.fold ~init:() rs ~f:(fun res r -> access_rule core_var_strs startF state_form r; res)
   done;
   state_table
 
 
-
-
+let table_to_dot table =
+  let content = Hashtbl.fold table ~init:"" ~f:(fun ~key:_ ~data:(id, _, _, _, paths) res ->
+    let part = String.concat (List.map paths ~f:(fun (FlowPath(form, rn, branch)) ->
+      let (dest_id, _, _, _, _) = Hashtbl.find_exn table form in
+      let label = sprintf "%s, %s" rn (ToStr.Smv.form_act branch) in
+      let state_type = if dest_id = 1 then "doublecircle" else "circle" in
+      sprintf "node [shape = %s]; %d -> %d [label = \"%s\"];\n  " state_type id dest_id label
+    )) in
+    res^part
+  ) in
+  sprintf "
+digraph finite_state_machine {
+  rankdir = LR;
+  size = \"16, 12\";
+  %s
+}
+" content
 
 
 
