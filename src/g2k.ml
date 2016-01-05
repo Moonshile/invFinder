@@ -25,7 +25,7 @@ let _False = boolc false
 let types = [
   enum "CACHE_STATE" [_I; _S; _E];
   enum "MSG_CMD" [_Empty; _ReqS; _ReqE; _Inv; _InvAck; _GntS; _GntE];
-  enum "NODE" (int_consts [1; 2; 3]);
+  enum "NODE" (int_consts [1; 2]);
   enum "DATA" (int_consts [1; 2]);
   enum "boolean" [_True; _False];
 ]
@@ -180,25 +180,30 @@ let protocol = {
 
 open Paramecium
 
-let name = "n_g2k" in
-let protocol = preprocess_rule_guard ~loach:protocol in
-let _smt_context = Smt.set_context name (ToStr.Smt2.context_of ~types ~vardefs) in
-(*let _mu_context = Murphi.set_context name (In_channel.read_all "n_g2k.m") in*)
-let _smv_context = Smv.set_context ~escape:(fun s -> s) name (Loach.ToSmv.protocol_act protocol) in
-let protocol = Loach.Trans.act ~loach:protocol in
-let simp_inst_guard r =
-  let Rule(n, p, f, s) = r in
-  rule n p (simplify f) s
-in
-let {name; types; vardefs; init; rules; properties} = protocol in
-let rule_insts = List.concat (List.map rules ~f:(fun r ->
-  let Rule(_, pds, _, _) = r in
-  let ps = cart_product_with_paramfix pds types in
-  if List.length ps = 0 then [simp_inst_guard r]
-  else List.map ps ~f:(fun p -> simp_inst_guard (apply_rule r ~p))
-)) in
-let endF = eqn (var (record [arr [("Cache", [paramfix "i" "NODE" (intc 1)])]; global "State"])) (const _E) in
-let startF = eqn (var (record [arr [("Cache", [paramfix "i" "NODE" (intc 1)])]; global "State"])) (const _I) in
-let table = FlowFinder.bfs startF endF rule_insts in
-print_endline (sprintf "table size: %d" (Hashtbl.length table));;
-
+let () = run_with_cmdline (fun () ->
+  let name = "n_g2k" in
+  let protocol = preprocess_rule_guard ~loach:protocol in
+  let _smt_context = Smt.set_context name (ToStr.Smt2.context_of ~types ~vardefs) in
+  (*let _mu_context = Murphi.set_context name (In_channel.read_all "n_g2k.m") in*)
+  let _smv_context = Smv.set_context ~escape:(fun s -> s) name (Loach.ToSmv.protocol_act protocol) in
+  let protocol = Loach.Trans.act ~loach:protocol in
+  let simp_inst_guard r =
+    let Rule(n, p, f, s) = r in
+    rule n p (simplify f) s
+  in
+  let {name; types; vardefs; init; rules; properties} = protocol in
+  let rule_insts = List.concat (List.map rules ~f:(fun r ->
+    let Rule(_, pds, _, _) = r in
+    let ps = cart_product_with_paramfix pds types in
+    if List.length ps = 0 then [simp_inst_guard r]
+    else List.map ps ~f:(fun p -> simp_inst_guard (apply_rule r ~p))
+  )) in
+  let endF = eqn (var (record [arr [("Cache", [paramfix "i" "NODE" (intc 1)])]; global "State"])) (const _E) in
+  let startF = eqn (var (record [arr [("Cache", [paramfix "i" "NODE" (intc 1)])]; global "State"])) (const _I) in
+  let core_vars = [
+    record [arr [("Cache", [paramfix "i" "NODE" (intc 1)])]; global "State"];
+    record [arr [("Chan1", [paramfix "i" "NODE" (intc 1)])]; global "Cmd"];
+  ] in
+  let table = FlowFinder.bfs core_vars startF endF rule_insts in
+  print_endline (sprintf "table size: %d" (Hashtbl.length table))
+)
