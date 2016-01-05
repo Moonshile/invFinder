@@ -99,7 +99,7 @@ let add_new_state state paths =
   let com_strs = List.map coms ~f:ToStr.Smv.form_act in
   let data = (id, state, coms, com_strs, paths) in
   let key = ToStr.Smv.form_act state in
-  print_endline (sprintf "%d: %s" id key);
+  print_endline (sprintf "search %d: %s" id key);
   Hashtbl.add_exn state_table ~key ~data
 
 
@@ -151,7 +151,9 @@ let remove_unreachable table startF =
   while not (Queue.is_empty q) do
     let state = Queue.dequeue_exn q in
     let (_, state_form, coms, com_strs, paths) = Hashtbl.find_exn table state in
-    let data = (Hashtbl.length res_table, state_form, coms, com_strs, paths) in
+    let id = Hashtbl.length res_table in
+    print_endline (sprintf "cut %d : %s" id state);
+    let data = (id, state_form, coms, com_strs, paths) in
     Hashtbl.add_exn res_table ~key:state ~data;
     List.fold ~init:() paths ~f:(fun res (FlowPath(form_str, _, _)) ->
       if List.exists (Hashtbl.keys res_table) ~f:(fun s -> s = form_str) then
@@ -177,12 +179,13 @@ let bfs core_vars startF endF rs =
   remove_unreachable state_table startF
 
 
-let table_to_dot table =
+let table_to_dot table endF =
+  let endF_str = ToStr.Smv.form_act endF in
   let content = Hashtbl.fold table ~init:"" ~f:(fun ~key:_ ~data:(id, _, _, _, paths) res ->
     let part = String.concat (List.map paths ~f:(fun (FlowPath(form, rn, branch)) ->
       let (dest_id, _, _, _, _) = Hashtbl.find_exn table form in
       let label = sprintf "%s, %s" rn (ToStr.Smv.form_act branch) in
-      let state_type = if dest_id = 1 then "doublecircle" else "circle" in
+      let state_type = if form = endF_str then "doublecircle" else "circle" in
       sprintf "node [shape = %s]; %d -> %d [label = \"%s\"];\n  " state_type id dest_id label
     )) in
     res^part

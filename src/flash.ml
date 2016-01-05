@@ -643,7 +643,7 @@ let () = run_with_cmdline (fun () ->
     record [global "Sta"; arr [("Proc", [paramfix "i2" "NODE" (intc 1)])]; global "CacheState"];
   ] in
   let table = FlowFinder.bfs core_vars startF endF rule_insts in
-  let dot_str = FlowFinder.table_to_dot table in
+  let dot_str = FlowFinder.table_to_dot table endF in
   Out_channel.write_all (name^".dot") dot_str
 )
 
