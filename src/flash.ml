@@ -641,6 +641,7 @@ let () = run_with_cmdline (fun () ->
   ) (const _CACHE_I) in
   let core_vars = [
     record [global "Sta"; arr [("Proc", [paramfix "i2" "NODE" (intc 1)])]; global "CacheState"];
+    record [global "Sta"; arr [("UniMsg", [paramfix "i2" "NODE" (intc 1)])]; global "Cmd"];
   ] in
   let table = FlowFinder.bfs core_vars startF endF rule_insts in
   let dot_str = FlowFinder.table_to_dot table endF in

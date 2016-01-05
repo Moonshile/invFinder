@@ -156,7 +156,9 @@ let remove_unreachable table startF =
     let data = (id, state_form, coms, com_strs, paths) in
     Hashtbl.add_exn res_table ~key:state ~data;
     List.fold ~init:() paths ~f:(fun res (FlowPath(form_str, _, _)) ->
-      if List.exists (Hashtbl.keys res_table) ~f:(fun s -> s = form_str) then
+      let exists_in_res_table = List.exists (Hashtbl.keys res_table) ~f:(fun s -> s = form_str) in
+      let exists_in_q = Queue.exists q ~f:(fun s -> s = form_str) in
+      if exists_in_res_table || exists_in_q then
         res
       else begin
         Queue.enqueue q form_str; res
@@ -181,22 +183,27 @@ let bfs core_vars startF endF rs =
 
 let table_to_dot table endF =
   let endF_str = ToStr.Smv.form_act endF in
+  let shapes = String.concat ~sep:"\n  " (List.map (Hashtbl.keys table) ~f:(fun s ->
+    let (id, _, _, _, _) = Hashtbl.find_exn table s in
+    let shape = if s = endF_str then "doublecircle" else "circle" in
+    sprintf "%d[shape = %s];" id shape
+  )) in
   let content = Hashtbl.fold table ~init:"" ~f:(fun ~key:_ ~data:(id, _, _, _, paths) res ->
-    let part = String.concat (List.map paths ~f:(fun (FlowPath(form, rn, branch)) ->
+    let part = String.concat ~sep:"\n  " (List.map paths ~f:(fun (FlowPath(form, rn, branch)) ->
       let (dest_id, _, _, _, _) = Hashtbl.find_exn table form in
       let label = sprintf "%s, %s" rn (ToStr.Smv.form_act branch) in
-      let state_type = if form = endF_str then "doublecircle" else "circle" in
-      sprintf "node [shape = %s]; %d -> %d [label = \"%s\"];\n  " state_type id dest_id label
+      sprintf "%d -> %d [label = \"%s\"];" id dest_id label
     )) in
-    res^part
+    res^"\n  "^part
   ) in
   sprintf "
 digraph finite_state_machine {
   rankdir = LR;
   size = \"16, 12\";
   %s
+  %s
 }
-" content
+" shapes content
 
 
 
