@@ -67,6 +67,7 @@ let find_repeat_state core_var_strs new_state parent_state_str =
       | Neg(Eqn(Var(v), _))
       | Neg(Eqn(_, Var(v))) ->
         List.exists core_var_strs ~f:(fun vs -> vs = ToStr.Smv.var_act v)
+      | _ -> raise Empty_exception
     in
     if (paramed && is_new) || contains_core then Some com_str else None
   ) in
@@ -142,6 +143,27 @@ let access_rule core_var_strs startF endF r =
   wrapper useful
 
 
+let remove_unreachable table startF =
+  let startF_str = ToStr.Smv.form_act startF in
+  let res_table = Hashtbl.create ~hashable:String.hashable () in
+  let q = Queue.create () in
+  Queue.enqueue q startF_str;
+  while not (Queue.is_empty q) do
+    let state = Queue.dequeue_exn q in
+    let (_, state_form, coms, com_strs, paths) = Hashtbl.find_exn table state in
+    let data = (Hashtbl.length res_table, state_form, coms, com_strs, paths) in
+    Hashtbl.add_exn res_table ~key:state ~data;
+    List.fold ~init:() paths ~f:(fun res (FlowPath(form_str, _, _)) ->
+      if List.exists (Hashtbl.keys res_table) ~f:(fun s -> s = form_str) then
+        res
+      else begin
+        Queue.enqueue q form_str; res
+      end
+    )
+  done;
+  res_table
+
+
 let bfs core_vars startF endF rs =
   add_new_state startF [];
   add_new_state endF [];
@@ -152,7 +174,7 @@ let bfs core_vars startF endF rs =
     let (_, state_form, _, _, _) = Hashtbl.find_exn state_table state in
     List.fold ~init:() rs ~f:(fun res r -> access_rule core_var_strs startF state_form r; res)
   done;
-  state_table
+  remove_unreachable state_table startF
 
 
 let table_to_dot table =
