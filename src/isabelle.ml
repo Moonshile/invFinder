@@ -502,13 +502,13 @@ let gen_inst relations condition has_outer_moreover =
   assume b1: \"%s\"
   have \"%s\" by auto
 %s
-  ultimately have \"invHoldForRule' s f r (invariants N)\" by auto
+  ultimately have \"invHoldForRule' s f r (invariants N)\" by satx
 }" condition (String.concat ~sep:"\\<or>" branches) (String.concat ~sep:"\n" moreovers)
     else begin
       sprintf
 "have \"%s\" by auto
 %s
-ultimately show \"invHoldForRule' s f r (invariants N)\" by auto"
+ultimately show \"invHoldForRule' s f r (invariants N)\" by satx"
         (String.concat ~sep:"\\<or>" branches) (String.concat ~sep:"\n" moreovers)
     end
   else begin
@@ -569,7 +569,7 @@ let gen_lemma relations rules =
         sprintf
 "have \"%s\" apply (cut_tac a1 a2, auto) done
 %s
-ultimately show \"invHoldForRule' s f r (invariants N)\" by auto"
+ultimately show \"invHoldForRule' s f r (invariants N)\" by satx"
           (String.concat ~sep:"\\<or>" conditions)
           (String.concat ~sep:"\n" moreovers)
     in
@@ -672,7 +672,7 @@ let gen_lemma_inv_on_rules (Paramecium.Prop(pn, p_pds, _)) rules =
   apply (cut_tac b1, auto) done
 %s
   ultimately show \"invHoldForRule' s f r (invariants N)\"
-  apply fastforce done
+  by satx
 qed
 "
     pn
@@ -709,7 +709,7 @@ let gen_lemma_invs_on_rules invs =
   apply (cut_tac a1, auto) done
 %s
   ultimately show \"invHoldForRule' s f r (invariants N)\"
-  apply fastforce done
+  by satx
 qed
 "
     (String.concat ~sep:"\\<or>\n    " prop_constraints)
@@ -748,7 +748,7 @@ and b3: \"formEval ini s\"
   apply (cut_tac b1, simp) done
 %s
   ultimately show \"formEval f s\"
-  apply fastforce done
+  by satx
 qed
 " (String.concat ~sep:"\\<or>\n    " prop_constraints) (String.concat ~sep:"\n" moreovers)
 

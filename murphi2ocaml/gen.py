@@ -230,6 +230,8 @@ class Formula(object):
             else:
                 big_parts.append(p)
         if len(big_parts) == 0:
+            print text
+            print parts
             logging.error('could not split text: %s'%text)
         return big_parts
 
@@ -657,7 +659,7 @@ class Invariant(object):
         self.value = '%s\n\nlet properties = [%s]'%('\n\n'.join(invs), '; '.join(names))
 
     def invsets(self, text, consts):
-        pattern = r'ruleset\s*([\w :;]*)do\s*invariant\s*\"(.*?)\"\s*(.*?)\s*;\s*endruleset\s*;'
+        pattern = r'ruleset\s*([\w :;]*)do\s*invariant\s*\"(.*?)\"\s*(.*?)\s*;{0,1}\s*endruleset\s*;'
         inv_strs = re.findall(pattern, text, re.S)
         invs = []
         names = []
@@ -674,11 +676,13 @@ class Invariant(object):
         return names, invs
 
     def inv_alone(self, text, consts):
-        pattern = r'[^do]+\s+invariant\s*\"(.*?)\"\s*(.*?)\s*;'
+        # TODO problems exist here
+        pattern = r'[^do]+\s+invariant\s*\"(.*?)\"\s*(.*?)\s*;{0,1}'
         inv_strs = re.findall(pattern, text, re.S)
         invs = []
         names = []
         for name, form in inv_strs:
+            print name, form
             name = escape(name)
             formula = Formula(form, [], consts)
             names.append(name)
