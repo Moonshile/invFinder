@@ -156,7 +156,12 @@ let partition list ~f =
   List.map assoc ~f:(fun (_, v) -> v)
 
 
-
+let rec stupid_dedup_list ls ~f =
+  match ls with
+  | [] -> []
+  | ele::ls' ->
+    let tail = stupid_dedup_list ls' ~f in
+    if List.exists ls' ~f:(fun x -> f x ele) then tail else ele::tail
 
 
 

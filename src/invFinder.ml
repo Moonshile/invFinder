@@ -876,7 +876,7 @@ let write_res_cache cinvs new_relations =
 
 (* This function has problems and is discarded *)
 let upgrade_res_cache () =
-  let rec eliminate_eqn_TF form =
+  let eliminate_eqn_TF form =
     match form with
     | Neg(Eqn(Const(Boolc(true)), e1))
     | Neg(Eqn(e1, Const(Boolc(true)))) -> eqn e1 (Const(Boolc(false)))
@@ -950,7 +950,7 @@ let simplify_prop property =
   |> List.map ~f:(fun form -> match form with | OrList(fl) -> fl | _ -> [form])
   |> List.concat
   |> List.filter ~f:(fun x -> match x with | Miracle -> false | _ -> true)
-  |> List.dedup ~compare:symmetry_form
+  |> stupid_dedup_list ~f:(fun x y -> symmetry_form x y = 0)
 
 
 

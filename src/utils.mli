@@ -73,6 +73,8 @@ val partition_with_label : 'a list -> f:('a -> 'b) -> ('b * 'a list) list
 *)
 val partition : 'a list -> f:('a -> 'b) -> 'a list list
 
+val stupid_dedup_list : 'a list -> f:('a -> 'a -> bool) -> 'a list
+
 (** Denotes there are errors while execute a program *)
 exception Exec_error
 
