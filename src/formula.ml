@@ -146,35 +146,48 @@ let simplify ?(eli_eqn=false) form =
     match form with
     | Chaos -> chaos
     | Miracle -> miracle
+    | Neg(Chaos) -> miracle
+    | Neg(Miracle) -> chaos
     | Eqn(_)
     | Neg(Eqn(_)) ->
       if is_tautology form then chaos
       else if not (is_satisfiable form) then miracle
       else begin form end
-    | AndList(_) ->
-      let simplified = List.map (remove_inner_andList form) ~f:wrapper in
-      if List.exists simplified ~f:(fun x -> x = Miracle) then miracle
+    | AndList(ls) ->
+      let simplified_ls = List.map ls ~f:wrapper in
+      if List.exists simplified_ls ~f:(fun x -> x = Miracle) then miracle
       else begin
-        let not_chaos = forms_dedup (List.filter simplified ~f:(fun x -> not (x = Chaos))) in
-        match not_chaos with
+        let not_chaos = forms_dedup (List.filter simplified_ls ~f:(fun x -> not (x = Chaos))) in
+        let or_coms = List.map not_chaos ~f:(fun x ->
+          match x with
+          | OrList(ors) -> ors
+          | _ -> [x]
+        ) in
+        let eliminate_inner_and_of_list ls =
+          List.concat (List.map ls ~f:(fun x -> match x with | AndList(ls) -> ls | _ -> [x]))
+        in
+        match cartesian_product or_coms with
         | [] -> chaos
-        | [one] -> one
-        | _ ->
-          not_chaos
-          |> List.map ~f:(fun x -> match x with | OrList(fl) -> fl | _ -> [x])
-          |> cartesian_product
-          |> List.map ~f:(fun x -> andList x)
-          |> (fun fl -> match fl with | [andf] -> andf | _ -> orList fl)
+        | [[one]] -> one
+        | [andls] -> andList (eliminate_inner_and_of_list andls)
+        | orls -> orList (List.map orls ~f:(fun c ->
+          match c with
+          | [x] -> x
+          | _ -> andList (eliminate_inner_and_of_list c)
+        ))
       end
-    | OrList(_) ->
-      let simplified = List.map (remove_inner_orList form) ~f:(wrapper) in
-      if List.exists simplified ~f:(fun x -> x = Chaos) then chaos
+    | OrList(ls) ->
+      let simplified_ls = List.map ls ~f:wrapper in
+      if List.exists simplified_ls ~f:(fun x -> x = Chaos) then chaos
       else begin
-        let not_miracle = forms_dedup (List.filter simplified ~f:(fun x -> not (x = Miracle))) in
-        match not_miracle with
+        let not_miracle = forms_dedup (List.filter simplified_ls ~f:(fun x -> not (x = Miracle))) in
+        let no_inner_or = 
+          List.map not_miracle ~f:(fun x -> match x with | OrList(ls) -> ls | _ -> [x])
+        in
+        match List.concat no_inner_or with
         | [] -> miracle
         | [one] -> one
-        | _ -> orList not_miracle
+        | orls -> orList orls
       end
     | Neg(_)
     | Imply(_) -> Prt.error (ToStr.Smv.form_act form); raise Empty_exception
