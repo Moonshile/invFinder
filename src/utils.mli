@@ -75,6 +75,9 @@ val partition : 'a list -> f:('a -> 'b) -> 'a list list
 
 val stupid_dedup_list : 'a list -> f:('a -> 'a -> bool) -> 'a list
 
+val string_replace : string -> string -> string -> string
+
+
 (** Denotes there are errors while execute a program *)
 exception Exec_error
 

@@ -186,13 +186,16 @@ let get_rule_inst_name rname pfs =
   in
   sprintf "%s%s" rname (String.concat (List.map pfs ~f:paramref_act))
 
-let sort_pfs pds pfs = List.map pds ~f:(fun (Paramdef(name, _)) ->
-  List.find_exn pfs ~f:(fun pr ->
-    match pr with
-    | Paramfix(n, _, _) -> n = name
-    | _ -> raise Empty_exception
+let sort_pfs pds pfs =
+  (*Prt.info (String.concat ~sep:", " (List.map pds ~f:(fun (Paramdef(n, _)) -> n)));
+  Prt.warning (String.concat ~sep:", " (List.map pfs ~f:(fun (Paramfix(n, _, _)) -> n)));*)
+  List.map pds ~f:(fun (Paramdef(name, _)) ->
+    List.find_exn pfs ~f:(fun pr ->
+      match pr with
+      | Paramfix(n, _, _) -> n = name
+      | _ -> raise Empty_exception
+    )
   )
-)
 
 
 
@@ -991,10 +994,10 @@ let result_to_str (cinvs, relations) =
     @param prop_params property parameters given
     @return causal relation table
 *)
-let find ?(smv_escape=(fun inv_str -> inv_str))
+let find ?(insym_types=[]) ?(smv_escape=(fun inv_str -> inv_str))
     ?(smv="") ?(smv_bmc="") ?(murphi="") protocol =
   let {name; types; vardefs; init; rules; properties} = Loach.Trans.act ~loach:protocol in
-  let _smt_context = Smt.set_context name (ToStr.Smt2.context_of ~types ~vardefs) in
+  let _smt_context = Smt.set_context name (ToStr.Smt2.context_of ~insym_types ~types ~vardefs) in
   let _mu_context = Murphi.set_context name murphi in
   let _smv_bmc_context =
     if smv_bmc = "" then

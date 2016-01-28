@@ -597,6 +597,7 @@ module ToSmv = struct
   open Formula
 
   let types_ref = ref []
+  let vardefs_ref = ref []
 
   let statement_act ?(is_init=false) statement guard =
     let analyzed = analyze_if statement guard ~types:(!types_ref) in
@@ -628,7 +629,27 @@ module ToSmv = struct
         sprintf "next(%s) := case\n%sTRUE : %s;\nesac;" vstr conditions vstr
       end
     in
-    List.map analyzed ~f:(fun (v, guarded_exps) -> trans_assigns v guarded_exps)
+    List.filter analyzed ~f:(fun (v, _) ->
+      let Arrdef(_, tname) = List.find_exn (!vardefs_ref) ~f:(fun x ->
+        let Arrdef(ls, t) = x in
+        let parts = List.map ls ~f:(fun (n, pds) ->
+          match pds with
+          | [] -> [n]
+          | _ ->
+            let ps = cart_product_with_paramfix pds (!types_ref) in
+            let const_strs = List.map ps ~f:(fun group -> 
+              List.map group ~f:(fun pr -> paramref_act pr)
+              |> String.concat
+            ) in
+            List.map const_strs ~f:(fun cstr -> sprintf "%s%s" n cstr)
+        ) in
+        let full_parts = cartesian_product parts in
+        let full_names = List.map full_parts ~f:(fun parts -> String.concat ~sep:"." parts) in
+        List.exists full_names ~f:(fun fn -> fn = var_act v)
+      ) in
+      List.length (name2type ~tname ~types:(!types_ref)) > 1
+    )
+    |> List.map ~f:(fun (v, guarded_exps) -> trans_assigns v guarded_exps)
     |> String.concat ~sep:"\n"
 
   let init_act statement =
@@ -678,6 +699,7 @@ module ToSmv = struct
   let protocol_act ?(limit_param=true) {name=_; types; vardefs; init; rules; properties} =
     let types = if limit_param then List.map types ~f:limit_params_in_typedef else types in
     types_ref := types;
+    vardefs_ref := vardefs;
     let property_strs = [""] (* List.map properties ~f:prop_act *) in
     let rule_insts = List.concat (List.map rules ~f:(rule_to_insts ~types)) in
     let rule_proc_insts, rule_procs = List.unzip (List.map rule_insts ~f:(rule_act)) in
@@ -696,3 +718,154 @@ module ToSmv = struct
 
 
 end
+
+
+
+
+
+
+
+
+
+
+
+module PartParam = struct
+
+  let attach name pf =
+    let c =
+      match pf with
+      | Paramfix(_, _, x) -> x
+      | _ -> raise Empty_exception
+    in
+    match c with
+    | Strc(x) -> sprintf "%s[%s]" name x
+    | Intc(x) -> sprintf "%s[%d]" name x
+    | Boolc(x) -> sprintf "%s[%b]" name x
+
+  let attach_list name pfs =
+    List.fold pfs ~init:name ~f:attach
+
+  let apply_paramref pr ~p =
+    match pr with
+    | Paramref(s) -> (
+        match find_paramfix p s with
+        | None -> pr
+        | Some pf -> pf
+      )
+    | Paramfix(_) -> pr
+
+  (* in Murphi, in-symmetric paramters should come ahead *)
+  let apply_array (Arr(ls)) ~p =
+    arr (List.map ls ~f:(fun (name, params) ->
+      let prs, pfs =
+        let insted = List.map params ~f:(apply_paramref ~p) in
+        List.partition_tf insted ~f:(fun x -> match x with | Paramref(_) -> true | _ -> false)
+      in
+      attach_list name pfs, prs
+    ))
+
+  let rec apply_exp e ~p =
+    match e with
+    | Const(_) -> e
+    | Var(x) -> var (apply_array x ~p)
+    | Param(pr) ->
+      begin
+        let pr' = apply_paramref pr ~p in
+        match pr' with
+        | Paramref(_) -> param pr'
+        | Paramfix(_, _, c) -> const c
+      end
+    | Ite(f, e1, e2) -> ite (apply_form f ~p) (apply_exp e1 ~p) (apply_exp e2 ~p)
+  and apply_form f ~p =
+    match f with
+    | Chaos
+    | Miracle -> f
+    | Eqn(e1, e2) -> eqn (apply_exp e1 ~p) (apply_exp e2 ~p)
+    | Neg(form) -> neg (apply_form form ~p)
+    | AndList(fl) -> andList (List.map fl ~f:(apply_form ~p))
+    | OrList(fl) -> orList (List.map fl ~f:(apply_form ~p))
+    | Imply(f1, f2) -> imply (apply_form f1 ~p) (apply_form f2 ~p)
+    | ForallFormula(paramdefs, form) -> forallFormula paramdefs (apply_form form ~p)
+    | ExistFormula(paramdefs, form) -> existFormula paramdefs (apply_form form ~p)
+
+  let rec apply_statement statement ~p =
+    match statement with
+    | Assign(v, e) -> assign (apply_array v ~p) (apply_exp e ~p)
+    | Parallel(sl) -> parallel (List.map sl ~f:(apply_statement ~p))
+    | IfStatement(f, s) -> ifStatement (apply_form f ~p) (apply_statement s ~p)
+    | IfelseStatement(f, s1, s2) ->
+      ifelseStatement (apply_form f ~p) (apply_statement s1 ~p) (apply_statement s2 ~p)
+    | ForStatement(s, pd) ->
+      forStatement (apply_statement s ~p) pd
+
+  let apply_rule r insym_types ~types =
+    let Rule(n, paramdefs, f, s) = r in
+    let insym_pds, sym_pds = List.partition_tf paramdefs ~f:(fun (Paramdef(_, tn)) ->
+      List.exists insym_types ~f:(fun t -> t = tn)
+    ) in
+    let ps = cart_product_with_paramfix insym_pds types in
+    let name p =
+      if p = [] then n
+      else begin
+        let const_act c =
+          match c with
+          | Intc(i) -> Int.to_string i
+          | Strc(s) -> String.lowercase s
+          | Boolc(b) -> String.uppercase (Bool.to_string b)
+        in
+        let paramref_act pr =
+          match pr with
+          | Paramfix(pn, _, c) -> sprintf "%s%s" pn (const_act c)
+          | Paramref(_) -> raise Unexhausted_inst
+        in
+        sprintf "%s_%s" n (String.concat ~sep:"_" (List.map p ~f:paramref_act))
+      end
+    in
+    List.map ps ~f:(fun p ->
+      rule (name p) sym_pds (apply_form f ~p) (apply_statement s ~p)
+    )
+
+  let apply_prop property insym_types ~types =
+    let Prop(name, paramdefs, f) = property in
+    let insym_pds, sym_pds = List.partition_tf paramdefs ~f:(fun (Paramdef(_, tn)) ->
+      List.exists insym_types ~f:(fun t -> t = tn)
+    ) in
+    let ps = cart_product_with_paramfix insym_pds types in
+    List.map ps ~f:(fun p ->
+      prop name sym_pds (apply_form f ~p)
+    )
+
+  let apply_protocol insym_types protocol =
+    let {name; types; vardefs; init; rules; properties} = protocol in
+    let rules = List.concat (List.map rules ~f:(fun r -> apply_rule r insym_types ~types)) in
+    let properties =
+      List.map properties ~f:(fun property -> apply_prop property insym_types ~types)
+      |> List.concat
+    in
+    { name;
+      types;
+      vardefs;
+      init;
+      rules;
+      properties
+    }
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

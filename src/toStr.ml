@@ -132,7 +132,11 @@ module Smt2 = struct
   let vardef_act vd ~types =
     let Arrdef(ls, tname) = vd in
     let (names, paramdefs_list) = List.unzip ls in
-    let name = String.concat ~sep:"." names in
+    let name =
+      String.concat ~sep:"." names
+      |> string_replace "\\[" "_"
+      |> string_replace "\\]" ""
+    in
     let paramdefs = List.concat paramdefs_list in
     let type_name tname =
       let consts = name2type ~tname ~types in
@@ -157,7 +161,11 @@ module Smt2 = struct
   let var_act v =
     let Arr(ls) = v in
     let (names, paramrefs_list) = List.unzip ls in
-    let name = String.concat ~sep:"." names in
+    let name =
+      String.concat ~sep:"." names
+      |> string_replace "\\[" "_"
+      |> string_replace "\\]" ""
+    in
     let params = List.concat paramrefs_list in
     if params = [] then
       name
@@ -193,30 +201,51 @@ module Smt2 = struct
       |> reduce ~default:"false" ~f:(fun res x -> sprintf "(or %s %s)" res x)
     | Imply(f1, f2) -> sprintf "(=> %s %s)" (form_act f1) (form_act f2)
 
-  let context_of ~types ~vardefs =
+  let apply_vardef vardef insym_types ~types =
+    let attach name pf =
+      let c =
+        match pf with
+        | Paramfix(_, _, x) -> x
+        | _ -> raise Empty_exception
+      in
+      match c with
+      | Strc(x) -> sprintf "%s_%s" name x
+      | Intc(x) -> sprintf "%s_%d" name x
+      | Boolc(x) -> sprintf "%s_%b" name x
+    in
+    let attach_list name pfs =
+      List.fold pfs ~init:name ~f:attach
+    in
+    let Arrdef(parts, tname) = vardef in
+    let new_parts = List.map parts ~f:(fun (n, pds) ->
+      let insym_pds, sym_pds = List.partition_tf pds ~f:(fun (Paramdef(_, tn)) ->
+        List.exists insym_types ~f:(fun t -> t = tn)
+      ) in
+      let ps = cart_product_with_paramfix insym_pds types in
+      if ps = [] then
+        [(n, pds)]
+      else begin
+        List.map ps ~f:(fun p -> (attach_list n p, sym_pds))
+      end
+    ) in
+    List.map (cartesian_product new_parts) ~f:(fun parts -> arrdef parts tname)
+
+  let context_of ~insym_types ~types ~vardefs =
     let type_str =
       List.map types ~f:type_act
       |> List.filter ~f:(fun x -> not (x = ""))
       |> String.concat ~sep:"\n"
     in
     let vardef_str =
-      List.map vardefs ~f:(vardef_act ~types)
+      List.map vardefs ~f:(fun vd -> apply_vardef vd insym_types ~types)
+      |> List.concat
+      |> List.map ~f:(vardef_act ~types)
       |> String.concat ~sep:"\n"
     in
     sprintf "%s%s" type_str vardef_str
 
   let form_of form =
     sprintf "(assert %s)" (form_act form)
-
-  (** Translate to smt2 string
-
-      @param types the type definitions of the protocol
-      @param vardefs the variable definitions of the protocol
-      @param form the formula to be translated
-      @return the smt2 string
-  *)
-  let act ~types ~vardefs form =
-    sprintf "%s\n%s\n(check-sat)" (context_of ~types ~vardefs) (form_of form)
 
 end
 

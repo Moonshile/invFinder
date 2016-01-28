@@ -77,14 +77,26 @@ class Record(object):
             return '  record_def \"%s\" %s _%s'%(n, p, v)
 
     def handleArr(self, n, v):
-        if v[:5] == 'array':
-            global index
-            pattern = re.compile(r'array \[(.+)\] of (.+)')
-            param, t = pattern.findall(v)[0]
-            index += 1
-            return self.judgeRecord(n, '[paramdef \"i%d\" \"%s\"]'%(index, param), t)
-        else:
-            return self.judgeRecord(n, '[]', v)
+        try:
+            if v[:5] == 'array':
+                global index
+                pattern = re.compile(r'array\s*\[(.+)\]\s*of\s*(.+)')
+                pattern2 = re.compile(r'array\s*\[(.+)\]\s*of\s*array\s*\[(.+)\]\s*of\s*(.+)')
+                if pattern2.match(v):
+                    index += 2
+                    param1, param2, t = pattern2.findall(v)[0]
+                    pds = '[paramdef "i%d" "%s"; paramdef "i%d" "%s"]'%(index - 1, param1, index, param2)
+                elif pattern.match(v):
+                    index += 1
+                    param, t = pattern.findall(v)[0]
+                    pds = '[paramdef "i%d" "%s"]'%(index, param)
+                else:
+                    logging.error('new type: %s'%v)
+                return self.judgeRecord(n, pds, t)
+            else:
+                return self.judgeRecord(n, '[]', v)
+        except:
+            logging.error(v)
     
     def evaluate(self, text):
         records = []
@@ -183,7 +195,7 @@ def analyzeParams(params):
     return param_name_dict, '[%s]'%('; '.join(param_defs))
 
 def escape(name):
-    return 'n_%s'%(re.sub(r'- ', '_', name))
+    return 'n_%s'%(re.sub(r'_+', '_', re.sub(r'[^a-zA-Z0-9]', '_', name).strip('_')))
 
 
 
@@ -499,6 +511,12 @@ class Statement(object):
                 return self.evalIf(statement, param_names, consts)
             elif statement.startswith('for'):
                 return self.evalFor(statement, param_names, consts)
+            elif re.match(r'clear\s', statement):
+                try:
+                    estr = statement[5:]
+                    return 'clear %s'%(self.evalVar(estr.strip()))
+                except:
+                    logging.error('unable to handle statement: %s'%statement)
             else:
                 try:
                     vstr, estr = statement.split(':=')

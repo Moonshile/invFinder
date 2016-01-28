@@ -13,16 +13,7 @@ module Smt2 : sig
 
   val form_of: formula -> string
 
-  val context_of: types:typedef list -> vardefs:vardef list -> string
-
-  (** Translate to smt2 string
-
-      @param types the type definitions of the protocol
-      @param vardefs the variable definitions of the protocol
-      @param form the formula to be translated
-      @return the smt2 string
-  *)
-  val act : types:typedef list -> vardefs:vardef list -> formula -> string
+  val context_of: insym_types:string list -> types:typedef list -> vardefs:vardef list -> string
 
 end
 

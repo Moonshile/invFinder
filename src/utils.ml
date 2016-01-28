@@ -164,7 +164,8 @@ let rec stupid_dedup_list ls ~f =
     if List.exists ls' ~f:(fun x -> f x ele) then tail else ele::tail
 
 
-
+let string_replace s d =
+  Re2.Regex.rewrite_exn (Re2.Regex.of_string s) ~template:d
 
 
 
