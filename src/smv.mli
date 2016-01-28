@@ -1,7 +1,4 @@
 (** Check a invariant with NuSMV
-
-    @author Yongjian Li <lyj238@gmail.com>
-    @author Kaiqiang Duan <duankq@ios.ac.cn>
 *)
 
 (* Raises when there are some errors in the NuSMV code *)

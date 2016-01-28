@@ -1,7 +1,4 @@
 (** Generate Isabelle code
-
-    @author Yongjian Li <lyj238@gmail.com>
-    @author Kaiqiang Duan <duankq@ios.ac.cn>
 *)
 
 open Core.Std

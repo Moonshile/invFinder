@@ -1,7 +1,4 @@
 (** For find invariants and causal relations based on Paramecium
-
-    @author Yongjian Li <lyj238@gmail.com>
-    @author Kaiqiang Duan <duankq@ios.ac.cn>
 *)
 
 open Core.Std

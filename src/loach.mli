@@ -1,7 +1,4 @@
 (** Language for cache coherence protocols
-
-    @author Yongjian Li <lyj238@gmail.com>
-    @author Kaiqiang Duan <duankq@ios.ac.cn>
 *)
 
 (*------------------------------ Types ---------------------------------*)

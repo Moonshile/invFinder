@@ -1,8 +1,5 @@
 (** Language for cache coherence protocols in support of
     parameterization and local variables
-
-    @author Yongjian Li <lyj238@gmail.com>
-    @author Kaiqiang Duan <duankq@ios.ac.cn>
 *)
 
 open Utils

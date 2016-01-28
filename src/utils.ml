@@ -1,7 +1,4 @@
 (** This library provides some useful functions
-
-    @author Yongjian Li <lyj238@gmail.com>
-    @author Kaiqiang Duan <duankq@ios.ac.cn>
 *)
 
 open Core.Std
