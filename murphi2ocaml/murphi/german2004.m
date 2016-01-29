@@ -522,12 +522,12 @@ endruleset;
 
 
 
-ruleset home: node_id; addr: addr_type; dest: node_id; channel2: channel_id do
+ruleset home: node_id; addr: addr_type; dest: node_id; channel2: channel_id; n:node_id do
 rule "`home' prepares invalidate for `addr'"
     channel2 = 2 &
     node[home].home_requests[addr].invalidate_list[dest] &
     node[home].home_requests[addr].status = pending
-  & exists n:node_id do node[home].home_requests[addr].invalidate_list[n] endexists
+  & node[home].home_requests[addr].invalidate_list[n]
   & !node[home].outchan[channel2].valid  ==>
 begin
   node[home].outchan[channel2].msg.addr   := addr;

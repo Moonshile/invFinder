@@ -155,8 +155,8 @@ let n_home_accepts_a_request_message =
 
 let n_home_prepares_invalidate_for_addr =
   let name = "n_home_prepares_invalidate_for_addr" in
-  let params = [paramdef "home" "node_id"; paramdef "addr" "addr_type"; paramdef "dest" "node_id"; paramdef "channel2" "channel_id"] in
-  let formula = (andList [(andList [(andList [(andList [(eqn (param (paramref "channel2")) (const (intc 2))); (eqn (var (record [arr [("node", [paramref "home"])]; arr [("home_requests", [paramref "addr"])]; arr [("invalidate_list", [paramref "dest"])]])) (const _True))]); (eqn (var (record [arr [("node", [paramref "home"])]; arr [("home_requests", [paramref "addr"])]; global "status"])) (const _pending))]); (existFormula [paramdef "n" "node_id"] (eqn (var (record [arr [("node", [paramref "home"])]; arr [("home_requests", [paramref "addr"])]; arr [("invalidate_list", [paramref "n"])]])) (const _True)))]); (eqn (var (record [arr [("node", [paramref "home"])]; arr [("outchan", [paramref "channel2"])]; global "valid"])) (const _False))]) in
+  let params = [paramdef "home" "node_id"; paramdef "addr" "addr_type"; paramdef "dest" "node_id"; paramdef "channel2" "channel_id"; paramdef "n" "node_id"] in
+  let formula = (andList [(andList [(andList [(andList [(eqn (param (paramref "channel2")) (const (intc 2))); (eqn (var (record [arr [("node", [paramref "home"])]; arr [("home_requests", [paramref "addr"])]; arr [("invalidate_list", [paramref "dest"])]])) (const _True))]); (eqn (var (record [arr [("node", [paramref "home"])]; arr [("home_requests", [paramref "addr"])]; global "status"])) (const _pending))]); (eqn (var (record [arr [("node", [paramref "home"])]; arr [("home_requests", [paramref "addr"])]; arr [("invalidate_list", [paramref "n"])]])) (const _True))]); (eqn (var (record [arr [("node", [paramref "home"])]; arr [("outchan", [paramref "channel2"])]; global "valid"])) (const _False))]) in
   let statement = (parallel [(assign (record [arr [("node", [paramref "home"])]; arr [("outchan", [paramref "channel2"])]; global "msg"; global "addr"]) (param (paramref "addr"))); (assign (record [arr [("node", [paramref "home"])]; arr [("outchan", [paramref "channel2"])]; global "msg"; global "op"]) (const _invalidate)); (assign (record [arr [("node", [paramref "home"])]; arr [("outchan", [paramref "channel2"])]; global "msg"; global "source"]) (param (paramref "home"))); (assign (record [arr [("node", [paramref "home"])]; arr [("outchan", [paramref "channel2"])]; global "msg"; global "dest"]) (param (paramref "dest"))); (assign (record [arr [("node", [paramref "home"])]; arr [("outchan", [paramref "channel2"])]; global "valid"]) (const (boolc true))); (assign (record [arr [("node", [paramref "home"])]; arr [("home_requests", [paramref "addr"])]; arr [("invalidate_list", [paramref "dest"])]]) (const (boolc false)))]) in
   rule name params formula statement
 
@@ -201,7 +201,7 @@ let protocol = {
 }
 
 let () = run_with_cmdline (fun () ->
-  let insym_types = ["addr_type"; "num_data_type"; "channel_id"] in
+  let insym_types = ["addr_type"; "num_data_type"; "channel_id"; "request_opcode"; "boolean"] in
   let protocol = PartParam.apply_protocol insym_types protocol in
   let protocol = preprocess_rule_guard ~loach:protocol in
   let cinvs_with_varnames, relations = find protocol
@@ -210,4 +210,3 @@ let () = run_with_cmdline (fun () ->
   in
   Isabelle.protocol_act protocol cinvs_with_varnames relations ()
 )
-

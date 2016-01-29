@@ -728,6 +728,9 @@ end
 
 module PartParam = struct
 
+ let insym_types_ref = ref []
+ let types_ref = ref []
+
   let attach name pf =
     let c =
       match pf with
@@ -793,14 +796,23 @@ module PartParam = struct
     | IfelseStatement(f, s1, s2) ->
       ifelseStatement (apply_form f ~p) (apply_statement s1 ~p) (apply_statement s2 ~p)
     | ForStatement(s, pd) ->
-      forStatement (apply_statement s ~p) pd
+      let insym_pds, sym_pds = List.partition_tf pd ~f:(fun (Paramdef(_, tn)) ->
+        List.exists (!insym_types_ref) ~f:(fun t -> t = tn)
+      ) in
+      let ps = cart_product_with_paramfix insym_pds (!types_ref) in
+      parallel (List.map ps ~f:(fun p' ->
+        let p = p@p' in
+        match sym_pds with
+        | [] -> apply_statement s ~p
+        | _ -> forStatement (apply_statement s ~p) sym_pds
+      ))
 
-  let apply_rule r insym_types ~types =
+  let apply_rule r =
     let Rule(n, paramdefs, f, s) = r in
     let insym_pds, sym_pds = List.partition_tf paramdefs ~f:(fun (Paramdef(_, tn)) ->
-      List.exists insym_types ~f:(fun t -> t = tn)
+      List.exists (!insym_types_ref) ~f:(fun t -> t = tn)
     ) in
-    let ps = cart_product_with_paramfix insym_pds types in
+    let ps = cart_product_with_paramfix insym_pds (!types_ref) in
     let name p =
       if p = [] then n
       else begin
@@ -822,21 +834,23 @@ module PartParam = struct
       rule (name p) sym_pds (apply_form f ~p) (apply_statement s ~p)
     )
 
-  let apply_prop property insym_types ~types =
+  let apply_prop property =
     let Prop(name, paramdefs, f) = property in
     let insym_pds, sym_pds = List.partition_tf paramdefs ~f:(fun (Paramdef(_, tn)) ->
-      List.exists insym_types ~f:(fun t -> t = tn)
+      List.exists (!insym_types_ref) ~f:(fun t -> t = tn)
     ) in
-    let ps = cart_product_with_paramfix insym_pds types in
+    let ps = cart_product_with_paramfix insym_pds (!types_ref) in
     List.map ps ~f:(fun p ->
       prop name sym_pds (apply_form f ~p)
     )
 
   let apply_protocol insym_types protocol =
     let {name; types; vardefs; init; rules; properties} = protocol in
-    let rules = List.concat (List.map rules ~f:(fun r -> apply_rule r insym_types ~types)) in
+    insym_types_ref := insym_types;
+    types_ref := types;
+    let rules = List.concat (List.map rules ~f:(fun r -> apply_rule r)) in
     let properties =
-      List.map properties ~f:(fun property -> apply_prop property insym_types ~types)
+      List.map properties ~f:(fun property -> apply_prop property)
       |> List.concat
     in
     { name;
